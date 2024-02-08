@@ -7,6 +7,7 @@ export class Node {
   constructor(private children: Element | Element[]) {}
 
   toString(): string {
+    if (this.children === undefined || this.children === null) return "";
     if (Array.isArray(this.children)) return this.children.join("\n");
     return this.children.toString();
   }
@@ -22,7 +23,7 @@ export function Fragment({ children }: { children?: unknown }): Element {
 }
 
 function sanitizer(value: unknown): Element {
-  const str = value || value === 0 ? (value as any).toString() : "";
+  const str = value || value === 0 ? value.toString() : "";
   if (!jsxConfig.sanitize || jsxConfig.trusted) return str;
   if (value instanceof Node) return value;
   return jsxConfig.sanitize(str, typeof value);
