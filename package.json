@@ -1,6 +1,6 @@
 {
   "name": "jsx-htmx",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "TypeSafe HTML templates using TypeScript. No need to learn a template library.",
   "repository": {
     "type": "git",

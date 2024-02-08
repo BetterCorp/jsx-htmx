@@ -237,3 +237,5 @@ export const html: HtmlTemplator = (raw, ...values) => {
   const values_ = values.map(htmlTransformChildren);
   return String.raw(raw, ...values_);
 };
+
+export type Element = string;
