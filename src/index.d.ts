@@ -55,6 +55,8 @@ declare module "jsx-htmx" {
   const jsxConfig: JsxConfig;
 
   const html: HtmlTemplator;
+
+  type Element = string;
 }
 declare module "jsx-htmx/jsx-runtime" {
   // element-types
