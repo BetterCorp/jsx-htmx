@@ -1,6 +1,6 @@
 {
   "name": "jsx-htmx",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "TypeSafe HTML templates using TypeScript. No need to learn a template library.",
   "repository": {
     "type": "git",
@@ -39,7 +39,7 @@
   "files": [
     "lib",
     "README.md",
-    "src/index.d.ts"
+    "src"
   ],
   "author": "Mitchell R <github@mrincworld.com>",
   "license": "AGPL-3.0-only",
