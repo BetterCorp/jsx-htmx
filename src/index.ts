@@ -239,3 +239,18 @@ export const html: HtmlTemplator = (raw, ...values) => {
 };
 
 export type Element = string;
+export type CustomComponentPropDerivedDefinition<CustomComponentType = null> =
+  CustomComponentType extends null ? Children : CustomComponentType & Children;
+export type CustomComponentPropDefinition<
+  CustomComponentType = null,
+  Props = null
+> = Props extends null
+  ? CustomComponentPropDerivedDefinition<CustomComponentType>
+  : Props & CustomComponentPropDerivedDefinition<CustomComponentType>;
+export type CustomComponent<CustomComponentType = null, Props = null> = {
+  (props: CustomComponentPropDefinition<CustomComponentType, Props>):
+    | Element
+    | string
+    | null;
+};
+export type SimpleCustomComponent<Props = null> = CustomComponent<null, Props>;

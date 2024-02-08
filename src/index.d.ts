@@ -13,6 +13,24 @@ declare module "jsx-htmx" {
     [key: string]: AttributeValue;
   }
 
+  type CustomComponentPropDerivedDefinition<CustomComponentType = null> =
+    CustomComponentType extends null
+      ? Children
+      : CustomComponentType & Children;
+  type CustomComponentPropDefinition<
+    CustomComponentType = null,
+    Props = null
+  > = Props extends null
+    ? CustomComponentPropDerivedDefinition<CustomComponentType>
+    : Props & CustomComponentPropDerivedDefinition<CustomComponentType>;
+  type CustomComponent<CustomComponentType = null, Props = null> = {
+    (props: CustomComponentPropDefinition<CustomComponentType, Props>):
+      | Element
+      | string
+      | null;
+  };
+  type SimpleCustomComponent<Props = null> = CustomComponent<null, Props>;
+
   interface JsxConfig {
     /**
      * When these attributes' values are set to object literals, they will be stringified to JSON.
