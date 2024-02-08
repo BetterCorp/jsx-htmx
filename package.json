@@ -1,6 +1,6 @@
 {
   "name": "jsx-htmx",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "TypeSafe HTML templates using TypeScript. No need to learn a template library.",
   "repository": {
     "type": "git",
@@ -24,6 +24,18 @@
       "types": "./lib/jsx-runtime.d.ts"
     },
     "./jsx-dev-runtime": {
+      "require": "./lib/jsx-dev-runtime.js",
+      "types": "./lib/jsx-dev-runtime.d.ts"
+    },
+    "./lib": {
+      "require": "./lib/index.js",
+      "types": "./lib/index.d.ts"
+    },
+    "./lib/jsx-runtime": {
+      "require": "./lib/jsx-runtime.js",
+      "types": "./lib/jsx-runtime.d.ts"
+    },
+    "./lib/jsx-dev-runtime": {
       "require": "./lib/jsx-dev-runtime.js",
       "types": "./lib/jsx-dev-runtime.d.ts"
     }
