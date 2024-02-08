@@ -1,8 +1,4 @@
-// /** @jsxImportSource typed-html */
-// /// <reference path="../jsx.d.ts" />
-// /// <reference types="typed-html" />
-
-import { JSX } from "jsx-htmx";
+import { JSX } from "jsx-htmx/jsx-runtime";
 import { jsxConfig, createElement } from "./index";
 
 type Element = JSX.Element | Node;

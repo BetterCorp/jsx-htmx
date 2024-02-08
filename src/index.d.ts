@@ -1,4 +1,62 @@
 declare module "jsx-htmx" {
+  type AttributeValue = number | string | Date | boolean | string[];
+
+  interface Children {
+    children?: AttributeValue;
+  }
+
+  interface CustomElementHandler {
+    (attributes: Attributes & Children, contents: string[]): string;
+  }
+
+  interface Attributes {
+    [key: string]: AttributeValue;
+  }
+
+  interface JsxConfig {
+    /**
+     * When these attributes' values are set to object literals, they will be stringified to JSON.
+     */
+    jsonAttributes: Set<string>;
+    /**
+     * The sanitizer to be used by the runtime.
+     * Accepts a function of the signature `(raw: string, originalType: string) => string`.
+     * @note {@link JsxConfig.trusted} must be false for elements to be sanitized.
+     * @see {@link Sanitizer}
+     */
+    sanitize: Sanitizer;
+    /**
+     * If false, value interpolations inside of JSX will be sanitized.
+     * @note Sanitization will change the return type of JSX functions to an object that overrides `toString`.
+     * 			 In most cases it will function as expected, but you might sometimes need to manually coerce the JSX tree to a string.
+     */
+    trusted: boolean;
+  }
+
+  type Sanitizer = false | ((raw: string, originalType: string) => string);
+
+  type InterpValue =
+    | { $$child: unknown }
+    | { $$children: unknown[] }
+    | { $$spread: unknown }
+    | Record<string, unknown>;
+
+  type HtmlTemplator<Output = string> = (
+    raw: TemplateStringsArray,
+    ...values: InterpValue[]
+  ) => Output;
+
+  function createElement(
+    name: string | CustomElementHandler,
+    attributes: (Attributes & Children) | undefined = {},
+    ...contents: string[]
+  ): string;
+
+  const jsxConfig: JsxConfig;
+
+  const html: HtmlTemplator;
+}
+declare module "jsx-htmx/jsx-runtime" {
   // element-types
   namespace JSX {
     interface HtmlTag {

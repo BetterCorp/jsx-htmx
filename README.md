@@ -1,24 +1,14 @@
 # jsx-htmx
 
-## !!!  
-Not ready for use
+## Why?
+
+Simply put, I needed an htmx JSX library that did not (1) globally override the JSX namespace and (2) did not use `///` require anywhere.  
+Both those meant that your whole project would be subject to those imports.  
+Where all I wanted was to be able to import a library and reference with jsx to get type same html/htmx AND be able to still use React/React.email elsewhere - while still being fully typesafe.
 
 
-
-
-
-
-
-
-
-
-
-
-[![npm](https://img.shields.io/npm/v/typed-htmx?style=flat-square)](https://www.npmjs.com/package/typed-htmx)
-[![docs](https://github.com/Desdaemon/typed-htmx/actions/workflows/docs.yml/badge.svg)](https://github.com/Desdaemon/typed-htmx/actions/workflows/docs.yml)
-[![tests](https://github.com/Desdaemon/typed-htmx/actions/workflows/test.yml/badge.svg)](https://github.com/Desdaemon/typed-htmx/actions/workflows/test.yml)
-
-[![demo](static/demo.gif)](https://asciinema.org/a/598553)
+[![npm](https://img.shields.io/npm/v/jsx-htmx?style=flat-square)](https://www.npmjs.com/package/jsx-htmx)  
+[![asciicast](https://asciinema.org/a/598553.svg)](https://asciinema.org/a/598553) (example from original design by Desdaemon - typed-htmx)
 
 Definitions for htmx+html attributes in JSX.
 
@@ -35,21 +25,29 @@ Configure your `tsconfig.json` as follows:
 {
   "compilerOptions": {
     "jsx": "react-jsx",
-    "moduleResolution": "node16"
+    "moduleResolution": "node"
+  }
+}
+```
+This library was designed for use with commonjs.  
+  
+#### Importing/using this:
+
+Either by defining it globally in your tsconfig file:
+
+```jsonc
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "moduleResolution": "node16",
+    "jsxImportSource": "jsx-htmx"
   }
 }
 ```
 
-An alternative is to include the library directly in each file instead of globally importing it.  
-completions for htmx attributes:
-
+OR Directly in the tsx/jsx files:
 ```jsx
-/** @jsx createElement */
-/** @jsxFrag Fragment */
-/** @jsxImportSource jsx-htmx/src */
-import { createElement } from "jsx-htmx/lib";
-import { Fragment } from "jsx-htmx/lib/jsx-runtime";
-import * as React from "jsx-htmx";
+/** @jsxImportSource jsx-htmx */
 
 function MyComponent({ children }) {
   return <div hx-get="/asd">{children}</div>;
@@ -57,33 +55,7 @@ function MyComponent({ children }) {
 }
 ```
 
-If your frontend library injects its own JSX types, you'll need to augment it.
-See the [example project](https://github.com/Desdaemon/typed-htmx/tree/main/example)
-for a demo. typed-html and React are supported out of the box.
 
-### As a JSX templating engine
-
-If you prefer to use JSX only for its templating capabilities in the vein of
-[typed-html], you can use `typed-htmx/typed-html` which is included with this
-library and optimized for htmx usage:
-
-- Attributes such as [`hx-vals`](https://htmx.org/attributes/hx-vals/) and
-  [`hx-headers`](https://htmx.org/attributes/hx-headers/) may also accept an object
-  literal, which will be stringified on demand.
-- Configurable options for sanitization, defaults to a no-op.
-
-Configure your `tsconfig.json` as follows:
-
-```jsonc
-{
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "jsxImportSource": "jsx-htmx",
-    "moduleResolution": "node16" // or "nodenext"
-  }
-}
-```
-
-# Source/Forked from  
+# Original sources/attributions:  
 [typed-htmx](https://github.com/Desdaemon/typed-htmx)  
 [typed-html](https://github.com/nicojs/typed-html)
