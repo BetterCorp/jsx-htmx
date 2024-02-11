@@ -79,6 +79,15 @@ declare module "jsx-htmx" {
 declare module "jsx-htmx/jsx-runtime" {
   // element-types
   namespace JSX {
+    interface HtmlRequired extends HtmlTag {
+      required?: boolean;
+    }
+    interface HtmlReadOnly extends HtmlTag {
+      readonly?: string;
+    }
+    interface HtmlDisabled extends HtmlTag {
+      disabled?: string;
+    }
     interface HtmlTag {
       accesskey?: string;
       class?: string;
@@ -132,10 +141,9 @@ declare module "jsx-htmx/jsx-runtime" {
       cite?: string;
     }
     interface HtmlBodyTag extends HtmlTag {}
-    interface HtmlButtonTag extends HtmlTag {
+    interface HtmlButtonTag extends HtmlTag, HtmlDisabled {
       action?: string;
       autofocus?: string;
-      disabled?: string;
       enctype?: string;
       form?: string;
       method?: string;
@@ -166,8 +174,7 @@ declare module "jsx-htmx/jsx-runtime" {
       // TODO: MAKE THIS WORK WITH HTMX
       // [anything: string]: string | boolean | undefined;
     }
-    interface HtmlFieldSetTag extends HtmlTag {
-      disabled?: string;
+    interface HtmlFieldSetTag extends HtmlTag, HtmlDisabled {
       form?: string;
       name?: string;
     }
@@ -202,14 +209,17 @@ declare module "jsx-htmx/jsx-runtime" {
       width?: string;
       height?: string;
     }
-    interface HtmlInputTag extends HtmlTag {
+    interface HtmlInputTag
+      extends HtmlTag,
+        HtmlRequired,
+        HtmlReadOnly,
+        HtmlDisabled {
       accept?: string;
       action?: string;
       alt?: string;
       autocomplete?: string;
       autofocus?: string;
       checked?: string | boolean;
-      disabled?: string | boolean;
       enctype?: string;
       form?: string;
       height?: string;
@@ -223,8 +233,6 @@ declare module "jsx-htmx/jsx-runtime" {
       novalidate?: string | boolean;
       pattern?: string;
       placeholder?: string;
-      readonly?: string;
-      required?: string;
       size?: string;
       src?: string;
       step?: string;
@@ -237,10 +245,9 @@ declare module "jsx-htmx/jsx-runtime" {
       cite?: string;
       datetime?: string | Date;
     }
-    interface KeygenTag extends HtmlTag {
+    interface KeygenTag extends HtmlTag, HtmlDisabled {
       autofocus?: string;
       challenge?: string;
-      disabled?: string;
       form?: string;
       keytype?: string;
       name?: string;
@@ -292,12 +299,10 @@ declare module "jsx-htmx/jsx-runtime" {
       reversed?: string;
       start?: string | number;
     }
-    interface HtmlOptgroupTag extends HtmlTag {
-      disabled?: string;
+    interface HtmlOptgroupTag extends HtmlTag, HtmlDisabled {
       label?: string;
     }
-    interface HtmlOptionTag extends HtmlTag {
-      disabled?: string;
+    interface HtmlOptionTag extends HtmlTag, HtmlDisabled {
       label?: string;
       selected?: string;
       value?: string;
@@ -315,11 +320,10 @@ declare module "jsx-htmx/jsx-runtime" {
       value?: string | number;
       max?: string | number;
     }
-    interface HtmlCommandTag extends HtmlTag {
+    interface HtmlCommandTag extends HtmlTag, HtmlDisabled {
       type?: string;
       label?: string;
       icon?: string;
-      disabled?: string;
       checked?: string;
       radiogroup?: string;
       default?: string;
@@ -345,13 +349,11 @@ declare module "jsx-htmx/jsx-runtime" {
     interface HtmlDetailsTag extends HtmlTag {
       open?: string;
     }
-    interface HtmlSelectTag extends HtmlTag {
+    interface HtmlSelectTag extends HtmlTag, HtmlRequired, HtmlDisabled {
       autofocus?: string;
-      disabled?: string;
       form?: string;
       multiple?: string;
       name?: string;
-      required?: string;
       size?: string;
     }
     interface HtmlSourceTag extends HtmlTag {
@@ -359,10 +361,9 @@ declare module "jsx-htmx/jsx-runtime" {
       type?: string;
       media?: string;
     }
-    interface HtmlStyleTag extends HtmlTag {
+    interface HtmlStyleTag extends HtmlTag, HtmlDisabled {
       media?: string;
       type?: string;
-      disabled?: string;
       scoped?: string;
     }
     interface HtmlTableTag extends HtmlTag {}
@@ -371,18 +372,19 @@ declare module "jsx-htmx/jsx-runtime" {
       rowspan?: string | number;
       headers?: string;
     }
-    interface HtmlTextAreaTag extends HtmlTag {
+    interface HtmlTextAreaTag
+      extends HtmlTag,
+        HtmlRequired,
+        HtmlReadOnly,
+        HtmlDisabled {
       autofocus?: string;
       cols?: string;
       dirname?: string;
-      disabled?: string;
       form?: string;
       maxlength?: string;
       minlength?: string;
       name?: string;
       placeholder?: string;
-      readonly?: string;
-      required?: string;
       rows?: string;
       wrap?: string;
     }
