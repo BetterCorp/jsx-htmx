@@ -9,7 +9,13 @@ Where all I wanted was to be able to import a library and reference with jsx to 
 [![npm](https://img.shields.io/npm/v/jsx-htmx?style=flat-square)](https://www.npmjs.com/package/jsx-htmx)  
 [![asciicast](https://asciinema.org/a/598553.svg)](https://asciinema.org/a/598553) (example from original design by Desdaemon - typed-htmx)
 
-Definitions for htmx+html attributes in JSX.
+Definitions for HTML + HTMX v2 attributes in JSX.
+
+This major version targets HTMX v2.
+
+- Legacy `hx-on` is not included.
+- SSE and WebSocket support are modeled as extensions via `hx-ext`, `sse-connect`, `sse-swap`, `ws-connect`, and `ws-send`.
+- For inline styles and scripts, prefer `css(...)` and `js(...)`.
 
 ## Usage
 
@@ -54,6 +60,47 @@ function MyComponent({ children }) {
   return <div hx-get="/asd">{children}</div>;
   //          ^?: string | undefined
 }
+```
+
+### HTMX v2 event handlers
+
+HTMX v2 uses `hx-on:*` attributes rather than the old `hx-on` form.
+
+```tsx
+<button
+  hx-post="/save"
+  {...{
+    "hx-on:htmx:before-request": "console.log('saving')",
+    "hx-on::after-request": "console.log('saved')",
+  }}
+>
+  Save
+</button>
+```
+
+### Inline CSS and JS
+
+For small inline blocks:
+
+```tsx
+/** @jsxImportSource jsx-htmx */
+import { css, js } from "jsx-htmx";
+
+<style>
+  {css({
+    ".bp-shell": {
+      display: "grid",
+      gap: "1rem",
+    },
+  })}
+</style>
+
+<script>
+  {js(() => {
+    const shell = document.querySelector(".bp-shell");
+    shell?.setAttribute("data-ready", "true");
+  })}
+</script>
 ```
 
 ## Component Creation

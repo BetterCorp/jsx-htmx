@@ -1,5 +1,5 @@
 import { JSX } from "jsx-htmx/jsx-runtime";
-import { jsxConfig, createElement } from "./index";
+import { jsxConfig, createElement, RawText } from "./index";
 
 type Element = JSX.Element | Node;
 
@@ -8,7 +8,7 @@ export class Node {
 
   toString(): string {
     if (this.children === undefined || this.children === null) return "";
-    if (Array.isArray(this.children)) return this.children.join("\n");
+    if (Array.isArray(this.children)) return this.children.join("");
     return this.children.toString();
   }
 }
@@ -16,13 +16,14 @@ export class Node {
 export function Fragment({ children }: { children?: unknown }): Element {
   if (Array.isArray(children)) {
     const elts = children.map(sanitizer);
-    return jsxConfig.trusted ? elts.join("\n") : new Node(elts);
+    return jsxConfig.trusted ? elts.join("") : new Node(elts);
   }
   const elt = sanitizer(children);
   return jsxConfig.trusted ? elt : new Node(elt);
 }
 
 function sanitizer(value: unknown): Element {
+  if (value instanceof RawText) return value.toString();
   const str = value || value === 0 ? value.toString() : "";
   if (!jsxConfig.sanitize || jsxConfig.trusted) return str;
   if (value instanceof Node) return value;
@@ -33,7 +34,7 @@ function expandLiterals(props: Record<string, unknown>) {
   for (const attr of jsxConfig.jsonAttributes) {
     if (!(attr in props)) continue;
     const value = props[attr];
-    if (typeof value === "object") {
+    if (value !== null && typeof value === "object") {
       props[attr] = { toString: () => JSON.stringify(value) };
     }
   }

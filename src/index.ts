@@ -2,6 +2,8 @@
 import {
   Attributes,
   Children,
+  CssDeclaration,
+  CssRules,
   CustomElementHandler,
   HtmlTemplator,
   InterpValue,
@@ -10,6 +12,47 @@ import {
 
 const capitalACharCode = "A".charCodeAt(0);
 const capitalZCharCode = "Z".charCodeAt(0);
+const booleanAttributes = new Set([
+  "allowfullscreen",
+  "async",
+  "autofocus",
+  "autoplay",
+  "checked",
+  "controls",
+  "default",
+  "defer",
+  "disabled",
+  "disableremoteplayback",
+  "download",
+  "formnovalidate",
+  "hidden",
+  "inert",
+  "ismap",
+  "loop",
+  "multiple",
+  "muted",
+  "nomodule",
+  "novalidate",
+  "open",
+  "playsinline",
+  "readonly",
+  "required",
+  "reversed",
+  "selected",
+]);
+const booleanishEnumeratedAttributes = new Set([
+  "contenteditable",
+  "draggable",
+  "spellcheck",
+]);
+
+export class RawText {
+  constructor(private readonly value: string) {}
+
+  toString(): string {
+    return this.value;
+  }
+}
 
 const isUpper = (input: string, index: number) => {
   const charCode = input.charCodeAt(index);
@@ -56,12 +99,13 @@ const attributeToString =
     } else
       switch (typeof value) {
         case "boolean":
-          // https://www.w3.org/TR/2008/WD-html5-20080610/semantics.html#boolean
-          if (value) {
-            return formattedName;
-          } else {
-            return "";
+          if (booleanishEnumeratedAttributes.has(formattedName)) {
+            return makeAttribute(value ? "true" : "false");
           }
+          if (value && booleanAttributes.has(formattedName)) {
+            return formattedName;
+          }
+          return value ? formattedName : "";
         default:
           return makeAttribute(escapeAttrNodeValue(value.toString()));
       }
@@ -69,26 +113,24 @@ const attributeToString =
 
 const attributesToString = (attributes: Attributes | undefined): string => {
   if (attributes) {
-    return (
-      " " +
-      Object.keys(attributes)
-        .filter((attribute) => attribute !== "children") // filter out children attributes
-        .map(attributeToString(attributes))
-        .filter((attribute) => attribute.length) // filter out negative boolean attributes
-        .join(" ")
-    );
+    const rendered = Object.keys(attributes)
+      .filter((attribute) => attribute !== "children")
+      .map(attributeToString(attributes))
+      .filter((attribute) => attribute.length)
+      .join(" ");
+    return rendered.length > 0 ? ` ${rendered}` : "";
   } else {
     return "";
   }
 };
 
-const contentsToString = (contents: any[] | undefined) => {
+const contentsToString = (contents: Array<string | RawText> | undefined) => {
   if (contents) {
     return contents
       .map((elements) =>
-        Array.isArray(elements) ? elements.join("\n") : elements
+        Array.isArray(elements) ? elements.join("") : elements
       )
-      .join("\n");
+      .join("");
   } else {
     return "";
   }
@@ -101,12 +143,10 @@ const isVoidElement = (tagName: string) => {
       "base",
       "br",
       "col",
-      "command",
       "embed",
       "hr",
       "img",
       "input",
-      "keygen",
       "link",
       "meta",
       "param",
@@ -120,7 +160,7 @@ const isVoidElement = (tagName: string) => {
 export function createElement(
   name: string | CustomElementHandler,
   attributes: (Attributes & Children) | undefined = {},
-  ...contents: string[]
+  ...contents: Array<string | RawText>
 ) {
   const children = (attributes && attributes.children) || contents;
 
@@ -183,6 +223,7 @@ function attrSanitizerWithoutDQ(raw: Renderable): string {
   );
 }
 function htmlSanitizer(raw: Renderable): string {
+  if (raw instanceof RawText) return raw.toString();
   const out = String(raw);
   if (jsxConfig.trusted) return out;
   return jsxConfig.sanitize ? jsxConfig.sanitize(out, typeof raw) : out;
@@ -237,6 +278,114 @@ export const html: HtmlTemplator = (raw, ...values) => {
   const values_ = values.map(htmlTransformChildren);
   return String.raw(raw, ...values_);
 };
+
+type CssScalar = string | number;
+
+function isCssScalar(value: unknown): value is CssScalar {
+  return typeof value === "string" || typeof value === "number";
+}
+
+function isCssDeclaration(value: unknown): value is CssDeclaration {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function serializeCssValue(value: CssScalar): string {
+  return String(value);
+}
+
+function serializeCssDeclarations(selector: string, declaration: CssDeclaration): string {
+  const declarations: string[] = [];
+  const nested: string[] = [];
+
+  for (const [propertyName, propertyValue] of Object.entries(declaration)) {
+    if (propertyValue === undefined || propertyValue === null) {
+      continue;
+    }
+
+    if (Array.isArray(propertyValue)) {
+      for (const item of propertyValue) {
+        if (item === undefined || item === null) continue;
+        declarations.push(`${toKebabCase(propertyName)}: ${serializeCssValue(item)};`);
+      }
+      continue;
+    }
+
+    if (isCssDeclaration(propertyValue)) {
+      const nestedSelector = propertyName.includes("&")
+        ? propertyName.replaceAll("&", selector)
+        : `${selector} ${propertyName}`;
+      nested.push(serializeCssRule(nestedSelector, propertyValue));
+      continue;
+    }
+
+    if (isCssScalar(propertyValue)) {
+      declarations.push(`${toKebabCase(propertyName)}: ${serializeCssValue(propertyValue)};`);
+    }
+  }
+
+  const rule = declarations.length > 0 ? `${selector} { ${declarations.join(" ")} }` : "";
+  return [rule, ...nested].filter((entry) => entry.length > 0).join("\n");
+}
+
+function serializeCssAtRule(ruleName: string, declaration: CssDeclaration): string {
+  const nestedRules: string[] = [];
+  for (const [nestedSelector, nestedDeclaration] of Object.entries(declaration)) {
+    if (!isCssDeclaration(nestedDeclaration)) {
+      continue;
+    }
+
+    nestedRules.push(serializeCssRule(nestedSelector, nestedDeclaration));
+  }
+
+  return `${ruleName} {\n${nestedRules.join("\n")}\n}`;
+}
+
+function serializeCssRule(selector: string, declaration: CssDeclaration): string {
+  if (selector.startsWith("@")) {
+    return serializeCssAtRule(selector, declaration);
+  }
+
+  return serializeCssDeclarations(selector, declaration);
+}
+
+export function css(input: string | CssRules): RawText {
+  if (typeof input === "string") {
+    return new RawText(input);
+  }
+
+  const rules: string[] = [];
+  for (const [selector, declaration] of Object.entries(input)) {
+    if (!isCssDeclaration(declaration)) {
+      continue;
+    }
+
+    rules.push(serializeCssRule(selector, declaration));
+  }
+
+  return new RawText(rules.join("\n"));
+}
+
+function extractFunctionBody(code: () => unknown): string {
+  const source = code.toString().trim();
+  const firstBrace = source.indexOf("{");
+  const lastBrace = source.lastIndexOf("}");
+
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return source.slice(firstBrace + 1, lastBrace).trim();
+  }
+
+  const arrowIndex = source.indexOf("=>");
+  if (arrowIndex >= 0) {
+    const expression = source.slice(arrowIndex + 2).trim();
+    return expression.endsWith(";") ? expression : `${expression};`;
+  }
+
+  return source;
+}
+
+export function js(input: string | (() => unknown)): RawText {
+  return new RawText(typeof input === "string" ? input : extractFunctionBody(input));
+}
 
 export type Element = string;
 export type CustomComponentPropDerivedDefinition<CustomComponentType = null> =

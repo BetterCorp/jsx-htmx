@@ -1,12 +1,28 @@
 declare module "jsx-htmx" {
-  type AttributeValue = number | string | Date | boolean | string[];
+  import type * as CSS from "csstype";
+
+  class RawText {
+    constructor(value: string);
+    toString(): string;
+  }
+
+  type CssScalar = string | number;
+  type CssLeafValue = CssScalar | readonly CssScalar[] | undefined | null;
+  type CssDeclaration = CSS.PropertiesFallback<CssScalar> & {
+    [selectorOrProperty: string]:
+      | CssLeafValue
+      | CssDeclaration;
+  };
+  type CssRules = Record<string, CssDeclaration | undefined>;
+
+  type AttributeValue = number | string | Date | boolean | string[] | RawText;
 
   interface Children {
-    children?: AttributeValue;
+    children?: AttributeValue | AttributeValue[];
   }
 
   interface CustomElementHandler {
-    (attributes: Attributes & Children, contents: string[]): string;
+    (attributes: Attributes & Children, contents: Array<string | RawText>): string;
   }
 
   interface Attributes {
@@ -67,51 +83,106 @@ declare module "jsx-htmx" {
   function createElement(
     name: string | CustomElementHandler,
     attributes: (Attributes & Children) | undefined = {},
-    ...contents: string[]
+    ...contents: Array<string | RawText>
   ): string;
 
   const jsxConfig: JsxConfig;
 
   const html: HtmlTemplator;
+  function css(input: string | CssRules): RawText;
+  function js(input: string | (() => unknown)): RawText;
 
   type Element = string;
 }
 declare module "jsx-htmx/jsx-runtime" {
   // element-types
   namespace JSX {
+    type Booleanish = boolean | "true" | "false";
+    type ContentEditableValue = Booleanish | "inherit" | "plaintext-only";
+    type CrossOrigin = "anonymous" | "use-credentials" | "";
+    type DirValue = "ltr" | "rtl" | "auto";
+    type FetchPriority = "high" | "low" | "auto";
+    type HiddenValue = boolean | "hidden" | "until-found";
+    type InputMode =
+      | "none"
+      | "text"
+      | "tel"
+      | "url"
+      | "email"
+      | "numeric"
+      | "decimal"
+      | "search";
+    type PopoverTargetAction = "hide" | "show" | "toggle";
+    type PreloadValue = "none" | "metadata" | "auto";
+    type ReferrerPolicy =
+      | "no-referrer"
+      | "no-referrer-when-downgrade"
+      | "origin"
+      | "origin-when-cross-origin"
+      | "same-origin"
+      | "strict-origin"
+      | "strict-origin-when-cross-origin"
+      | "unsafe-url";
+    type SpellcheckValue = boolean | "true" | "false" | "default";
+    type TargetValue = "_self" | "_blank" | "_parent" | "_top" | string;
+    type TranslateValue = "yes" | "no";
+
     interface HtmlRequired extends HtmlTag {
       required?: boolean;
     }
     interface HtmlReadOnly extends HtmlTag {
-      readonly?: string;
+      readonly?: boolean;
     }
     interface HtmlDisabled extends HtmlTag {
-      disabled?: string;
+      disabled?: boolean;
     }
     interface HtmlTag {
       accesskey?: string;
+      autocapitalize?: string;
       class?: string;
-      contenteditable?: string;
-      dir?: string;
-      hidden?: string | boolean;
+      contenteditable?: ContentEditableValue;
+      dir?: DirValue;
+      enterkeyhint?:
+        | "enter"
+        | "done"
+        | "go"
+        | "next"
+        | "previous"
+        | "search"
+        | "send";
+      exportparts?: string;
+      hidden?: HiddenValue;
       id?: string;
+      inert?: boolean;
+      inputmode?: InputMode;
       role?: string;
       lang?: string;
-      draggable?: string | boolean;
-      spellcheck?: string | boolean;
+      nonce?: string;
+      part?: string;
+      popover?: "" | "auto" | "manual";
+      slot?: string;
+      draggable?: boolean | "true" | "false" | "auto";
+      spellcheck?: SpellcheckValue;
       style?: string;
-      tabindex?: string;
+      tabindex?: string | number;
       title?: string;
-      translate?: string | boolean;
+      translate?: TranslateValue;
+      [dataAttr: `data-${string}`]: string | number | boolean | undefined;
+      [ariaAttr: `aria-${string}`]:
+        | string
+        | number
+        | boolean
+        | undefined;
     }
     interface HtmlAnchorTag extends HtmlTag {
       href?: string;
-      target?: string;
-      download?: string;
+      target?: TargetValue;
+      download?: string | boolean;
       ping?: string;
       rel?: string;
       media?: string;
       hreflang?: string;
+      referrerpolicy?: ReferrerPolicy;
       type?: string;
     }
     interface HtmlAreaTag extends HtmlTag {
@@ -119,38 +190,46 @@ declare module "jsx-htmx/jsx-runtime" {
       coords?: string;
       shape?: string;
       href?: string;
-      target?: string;
+      target?: TargetValue;
       ping?: string;
       rel?: string;
       media?: string;
       hreflang?: string;
+      download?: string | boolean;
+      referrerpolicy?: ReferrerPolicy;
       type?: string;
     }
     interface HtmlAudioTag extends HtmlTag {
       src?: string;
-      autobuffer?: string;
-      autoplay?: string;
-      loop?: string;
-      controls?: string;
+      autoplay?: boolean;
+      controls?: boolean;
+      controlslist?: string;
+      crossorigin?: CrossOrigin;
+      disableremoteplayback?: boolean;
+      loop?: boolean;
+      muted?: boolean;
+      preload?: PreloadValue;
     }
     interface BaseTag extends HtmlTag {
       href?: string;
-      target?: string;
+      target?: TargetValue;
     }
     interface HtmlQuoteTag extends HtmlTag {
       cite?: string;
     }
     interface HtmlBodyTag extends HtmlTag {}
     interface HtmlButtonTag extends HtmlTag, HtmlDisabled {
-      action?: string;
-      autofocus?: string;
-      enctype?: string;
+      autofocus?: boolean;
       form?: string;
-      method?: string;
+      formaction?: string;
+      formenctype?: string;
+      formmethod?: string;
+      formnovalidate?: boolean;
+      formtarget?: TargetValue;
       name?: string;
-      novalidate?: string | boolean;
-      target?: string;
-      type?: string;
+      popovertarget?: string;
+      popovertargetaction?: PopoverTargetAction;
+      type?: "submit" | "reset" | "button";
       value?: string;
     }
     interface HtmlDataListTag extends HtmlTag {}
@@ -171,8 +250,6 @@ declare module "jsx-htmx/jsx-runtime" {
       type?: string;
       width?: string;
       height?: string;
-      // TODO: MAKE THIS WORK WITH HTMX
-      // [anything: string]: string | boolean | undefined;
     }
     interface HtmlFieldSetTag extends HtmlTag, HtmlDisabled {
       form?: string;
@@ -185,29 +262,37 @@ declare module "jsx-htmx/jsx-runtime" {
       enctype?: string;
       method?: string;
       name?: string;
-      novalidate?: string | boolean;
-      target?: string;
+      novalidate?: boolean;
+      rel?: string;
+      target?: TargetValue;
     }
-    interface HtmlHtmlTag extends HtmlTag {
-      manifest?: string;
-    }
+    interface HtmlHtmlTag extends HtmlTag {}
     interface HtmlIFrameTag extends HtmlTag {
+      allow?: string;
+      allowfullscreen?: boolean;
+      height?: string;
+      loading?: "eager" | "lazy";
       src?: string;
       srcdoc?: string;
       name?: string;
+      referrerpolicy?: ReferrerPolicy;
       sandbox?: string;
-      seamless?: string;
       width?: string;
-      height?: string;
     }
     interface HtmlImageTag extends HtmlTag {
       alt?: string;
-      src?: string;
-      crossorigin?: string;
-      usemap?: string;
-      ismap?: string;
-      width?: string;
+      crossorigin?: CrossOrigin;
+      decoding?: "sync" | "async" | "auto";
+      fetchpriority?: FetchPriority;
       height?: string;
+      ismap?: boolean;
+      loading?: "eager" | "lazy";
+      referrerpolicy?: ReferrerPolicy;
+      sizes?: string;
+      src?: string;
+      srcset?: string;
+      usemap?: string;
+      width?: string;
     }
     interface HtmlInputTag
       extends HtmlTag,
@@ -215,28 +300,34 @@ declare module "jsx-htmx/jsx-runtime" {
         HtmlReadOnly,
         HtmlDisabled {
       accept?: string;
-      action?: string;
       alt?: string;
       autocomplete?: string;
-      autofocus?: string;
-      checked?: string | boolean;
-      enctype?: string;
+      autofocus?: boolean;
+      capture?: boolean | "user" | "environment";
+      checked?: boolean;
+      dirname?: string;
       form?: string;
+      formaction?: string;
+      formenctype?: string;
+      formmethod?: string;
+      formnovalidate?: boolean;
+      formtarget?: TargetValue;
       height?: string;
+      inputmode?: InputMode;
       list?: string;
       max?: string;
       maxlength?: string;
-      method?: string;
       min?: string;
-      multiple?: string;
+      minlength?: string;
+      multiple?: boolean;
       name?: string;
-      novalidate?: string | boolean;
       pattern?: string;
       placeholder?: string;
+      popovertarget?: string;
+      popovertargetaction?: PopoverTargetAction;
       size?: string;
       src?: string;
       step?: string;
-      target?: string;
       type?: string;
       value?: string;
       width?: string;
@@ -244,13 +335,6 @@ declare module "jsx-htmx/jsx-runtime" {
     interface HtmlModTag extends HtmlTag {
       cite?: string;
       datetime?: string | Date;
-    }
-    interface KeygenTag extends HtmlTag, HtmlDisabled {
-      autofocus?: string;
-      challenge?: string;
-      form?: string;
-      keytype?: string;
-      name?: string;
     }
     interface HtmlLabelTag extends HtmlTag {
       form?: string;
@@ -260,14 +344,21 @@ declare module "jsx-htmx/jsx-runtime" {
       value?: string | number;
     }
     interface HtmlLinkTag extends HtmlTag {
+      as?: string;
+      blocking?: string;
+      crossorigin?: CrossOrigin;
+      disabled?: boolean;
+      fetchpriority?: FetchPriority;
       href?: string;
-      crossorigin?: string;
-      rel?: string;
-      media?: string;
       hreflang?: string;
-      type?: string;
-      sizes?: string;
+      imagesizes?: string;
+      imagesrcset?: string;
       integrity?: string;
+      media?: string;
+      referrerpolicy?: ReferrerPolicy;
+      rel?: string;
+      sizes?: string;
+      type?: string;
     }
     interface HtmlMapTag extends HtmlTag {
       name?: string;
@@ -296,7 +387,7 @@ declare module "jsx-htmx/jsx-runtime" {
       height?: string;
     }
     interface HtmlOListTag extends HtmlTag {
-      reversed?: string;
+      reversed?: boolean;
       start?: string | number;
     }
     interface HtmlOptgroupTag extends HtmlTag, HtmlDisabled {
@@ -304,7 +395,7 @@ declare module "jsx-htmx/jsx-runtime" {
     }
     interface HtmlOptionTag extends HtmlTag, HtmlDisabled {
       label?: string;
-      selected?: string;
+      selected?: boolean;
       value?: string;
     }
     interface HtmlOutputTag extends HtmlTag {
@@ -320,51 +411,51 @@ declare module "jsx-htmx/jsx-runtime" {
       value?: string | number;
       max?: string | number;
     }
-    interface HtmlCommandTag extends HtmlTag, HtmlDisabled {
-      type?: string;
-      label?: string;
-      icon?: string;
-      checked?: string;
-      radiogroup?: string;
-      default?: string;
-    }
     interface HtmlLegendTag extends HtmlTag {}
-    interface HtmlBrowserButtonTag extends HtmlTag {
-      type?: string;
-    }
     interface HtmlMenuTag extends HtmlTag {
       type?: string;
       label?: string;
     }
     interface HtmlScriptTag extends HtmlTag {
-      src?: string;
-      type?: string;
-      charset?: string;
-      async?: string;
-      defer?: string;
-      crossorigin?: string;
+      async?: boolean;
+      blocking?: string;
+      crossorigin?: CrossOrigin;
+      defer?: boolean;
+      fetchpriority?: FetchPriority;
       integrity?: string;
+      nomodule?: boolean;
+      nonce?: string;
+      referrerpolicy?: ReferrerPolicy;
+      src?: string;
+      charset?: string;
       text?: string;
+      type?: string;
     }
     interface HtmlDetailsTag extends HtmlTag {
-      open?: string;
+      name?: string;
+      open?: boolean;
+    }
+    interface HtmlDialogTag extends HtmlTag {
+      open?: boolean;
     }
     interface HtmlSelectTag extends HtmlTag, HtmlRequired, HtmlDisabled {
-      autofocus?: string;
+      autofocus?: boolean;
       form?: string;
-      multiple?: string;
+      multiple?: boolean;
       name?: string;
-      size?: string;
+      size?: string | number;
     }
     interface HtmlSourceTag extends HtmlTag {
+      media?: string;
+      sizes?: string;
       src?: string;
+      srcset?: string;
       type?: string;
-      media?: string;
     }
-    interface HtmlStyleTag extends HtmlTag, HtmlDisabled {
+    interface HtmlStyleTag extends HtmlTag {
       media?: string;
+      nonce?: string;
       type?: string;
-      scoped?: string;
     }
     interface HtmlTableTag extends HtmlTag {}
     interface HtmlTableDataCellTag extends HtmlTag {
@@ -377,7 +468,7 @@ declare module "jsx-htmx/jsx-runtime" {
         HtmlRequired,
         HtmlReadOnly,
         HtmlDisabled {
-      autofocus?: string;
+      autofocus?: boolean;
       cols?: string;
       dirname?: string;
       form?: string;
@@ -385,7 +476,8 @@ declare module "jsx-htmx/jsx-runtime" {
       minlength?: string;
       name?: string;
       placeholder?: string;
-      rows?: string;
+      readonly?: boolean;
+      rows?: string | number;
       wrap?: string;
     }
     interface HtmlTableHeaderCellTag extends HtmlTag {
@@ -398,21 +490,26 @@ declare module "jsx-htmx/jsx-runtime" {
       datetime?: string | Date;
     }
     interface HtmlTrackTag extends HtmlTag {
-      default?: string;
+      default?: boolean;
       kind?: string;
       label?: string;
       src?: string;
       srclang?: string;
     }
     interface HtmlVideoTag extends HtmlTag {
-      src?: string;
-      poster?: string;
-      autobuffer?: string;
-      autoplay?: string;
-      loop?: string;
-      controls?: string;
+      autoplay?: boolean;
+      controls?: boolean;
+      controlslist?: string;
+      crossorigin?: CrossOrigin;
+      disableremoteplayback?: boolean;
       width?: string;
       height?: string;
+      loop?: boolean;
+      muted?: boolean;
+      playsinline?: boolean;
+      poster?: string;
+      preload?: PreloadValue;
+      src?: string;
     }
 
     // events
@@ -515,7 +612,6 @@ declare module "jsx-htmx/jsx-runtime" {
       aside: HtmlTag;
       audio: HtmlAudioTag;
       b: HtmlTag;
-      bb: HtmlBrowserButtonTag;
       base: BaseTag;
       bdi: HtmlTag;
       bdo: HtmlTag;
@@ -529,12 +625,12 @@ declare module "jsx-htmx/jsx-runtime" {
       code: HtmlTag;
       col: HtmlTableColTag;
       colgroup: HtmlTableColTag;
-      commands: HtmlCommandTag;
       data: DataTag;
       datalist: HtmlDataListTag;
       dd: HtmlTag;
       del: HtmlModTag;
       details: HtmlDetailsTag;
+      dialog: HtmlDialogTag;
       dfn: HtmlTag;
       div: HtmlTag;
       dl: HtmlTag;
@@ -562,7 +658,6 @@ declare module "jsx-htmx/jsx-runtime" {
       input: HtmlInputTag;
       ins: HtmlModTag;
       kbd: HtmlTag;
-      keygen: KeygenTag;
       label: HtmlLabelTag;
       legend: HtmlLegendTag;
       li: HtmlLITag;
@@ -582,6 +677,7 @@ declare module "jsx-htmx/jsx-runtime" {
       output: HtmlOutputTag;
       p: HtmlTag;
       param: HtmlParamTag;
+      picture: HtmlTag;
       pre: HtmlTag;
       progress: HtmlProgressTag;
       q: HtmlQuoteTag;
@@ -596,14 +692,16 @@ declare module "jsx-htmx/jsx-runtime" {
       section: HtmlTag;
       select: HtmlSelectTag;
       small: HtmlTag;
+      slot: HtmlTag;
       source: HtmlSourceTag;
       span: HtmlTag;
       strong: HtmlTag;
       style: HtmlStyleTag;
       sub: HtmlTag;
+      summary: HtmlTag;
       sup: HtmlTag;
       table: HtmlTableTag;
-      tbody: HtmlTag;
+      tbody: HtmlTableSectionTag;
       td: HtmlTableDataCellTag;
       template: HtmlTag;
       textarea: HtmlTextAreaTag;
@@ -793,7 +891,7 @@ declare module "jsx-htmx/jsx-runtime" {
     }
 
     /**
-     * Definitions for htmx attributes up to 1.9.3.
+     * Definitions for HTMX v2 attributes and common official extensions.
      */
     interface HtmxAttributes {
       /** @ignore For React compatibility only. */
@@ -847,13 +945,6 @@ declare module "jsx-htmx/jsx-runtime" {
        * @since 1.9.3
        */
       ["hx-on:"]?: string;
-      /**
-       * Handle any event with a script inline. Each listener is specified on a separate line.
-       * @see https://htmx.org/attributes/hx-on/
-       * @remarks Superseded by `hx-on:$event`, unless IE11 support is required.
-       * @since 1.9.0
-       */
-      ["hx-on"]?: string;
       /**
        * Pushes the URL into the browser location bar, creating a new history entry.
        * @see https://htmx.org/attributes/hx-push-url/
@@ -1058,6 +1149,25 @@ declare module "jsx-htmx/jsx-runtime" {
        * CDN: https://unpkg.com/hyperscript.org
        */
       _?: AnyStr;
+      /**
+       * Handle DOM or htmx events inline with the HTMX v2 `hx-on:*` syntax.
+       * Examples:
+       * - `hx-on:click`
+       * - `hx-on:htmx:before-request`
+       * - `hx-on::after-request`
+       *
+       * HTML attribute names are case-insensitive, so event names should use kebab-case in markup.
+       * `hx-on::event-name` is shorthand for htmx events.
+       *
+       * @see https://htmx.org/attributes/hx-on/
+       */
+      [key: `hx-on:${string}`]: string | undefined;
+      /**
+       * Handle htmx lifecycle events inline with shorthand syntax.
+       *
+       * @see https://htmx.org/attributes/hx-on/
+       */
+      [key: `hx-on::${string}`]: string | undefined;
     }
 
     interface HtmxExtensions extends HtmxBuiltinExtensions {}

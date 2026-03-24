@@ -1,7 +1,7 @@
 {
   "name": "jsx-htmx",
-  "version": "1.0.8",
-  "description": "TypeSafe HTML templates using TypeScript. No need to learn a template library.",
+  "version": "2.0.0",
+  "description": "Type-safe HTML and HTMX v2 templates using TypeScript.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/BetterCorp/jsx-htmx.git"
@@ -64,5 +64,8 @@
   "devDependencies": {
     "@types/node": "^20.11.16",
     "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "csstype": "^3.2.3"
   }
 }
