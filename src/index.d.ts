@@ -1178,3 +1178,158 @@ declare module "jsx-htmx/jsx-runtime" {
     interface HTMLElement extends HtmxAttributes {}
   }
 }
+
+interface HtmxPathInfo {
+  requestPath?: string;
+  finalRequestPath?: string;
+  responsePath?: string | null;
+  anchor?: string | null;
+}
+
+interface HtmxRequestConfig {
+  boosted?: boolean;
+  useUrlParams?: boolean;
+  formData?: FormData;
+  parameters?: Record<string, string | string[]>;
+  unfilteredParameters?: Record<string, string | string[]>;
+  headers?: Record<string, string>;
+  target?: Element | null;
+  verb?: string;
+  errors?: unknown[];
+  withCredentials?: boolean;
+  timeout?: number;
+  path?: string;
+  triggeringEvent?: Event;
+  elt?: Element;
+}
+
+interface HtmxBaseDetail {
+  elt: Element;
+}
+
+interface HtmxCancelableRequestDetail extends HtmxBaseDetail {
+  xhr: XMLHttpRequest;
+  target?: Element | null;
+  requestConfig?: HtmxRequestConfig;
+  boosted?: boolean;
+  select?: string;
+  pathInfo?: HtmxPathInfo;
+}
+
+interface HtmxSwapDetail extends HtmxCancelableRequestDetail {
+  shouldSwap?: boolean;
+  ignoreTitle?: boolean;
+  swapOverride?: string;
+  selectOverride?: string;
+  serverResponse?: string;
+  isError?: boolean;
+  successful?: boolean;
+  failed?: boolean;
+}
+
+interface HtmxLoadDetail extends HtmxBaseDetail {
+  xhr: XMLHttpRequest;
+  target?: Element | null;
+  requestConfig?: HtmxRequestConfig;
+}
+
+interface HtmxConfigRequestDetail extends HtmxBaseDetail {
+  xhr: XMLHttpRequest;
+  target?: Element | null;
+  requestConfig?: HtmxRequestConfig;
+  path?: string;
+  verb?: string;
+  headers?: Record<string, string>;
+  parameters?: Record<string, string | string[]>;
+  unfilteredParameters?: Record<string, string | string[]>;
+  triggeringEvent?: Event;
+}
+
+interface HtmxConfirmationDetail extends HtmxBaseDetail {
+  xhr?: XMLHttpRequest;
+  target?: Element | null;
+  path?: string;
+  verb?: string;
+  triggeringEvent?: Event;
+  question?: string;
+}
+
+interface HtmxPromptDetail extends HtmxBaseDetail {
+  prompt?: string | null;
+  target?: Element | null;
+}
+
+interface HtmxValidationDetail extends HtmxBaseDetail {
+  message?: string;
+  validity?: ValidityState;
+}
+
+interface HtmxSseDetail extends HtmxBaseDetail {
+  source?: EventSource;
+}
+
+interface HtmxWsDetail extends HtmxBaseDetail {
+  socketWrapper?: unknown;
+  message?: unknown;
+}
+
+interface HtmxEventDetailMap {
+  "htmx:abort": HtmxBaseDetail;
+  "htmx:afterOnLoad": HtmxLoadDetail;
+  "htmx:afterProcessNode": HtmxBaseDetail;
+  "htmx:afterRequest": HtmxSwapDetail;
+  "htmx:afterSettle": HtmxSwapDetail;
+  "htmx:afterSwap": HtmxSwapDetail;
+  "htmx:beforeCleanupElement": HtmxBaseDetail;
+  "htmx:beforeOnLoad": HtmxLoadDetail;
+  "htmx:beforeProcessNode": HtmxBaseDetail;
+  "htmx:beforeRequest": HtmxCancelableRequestDetail;
+  "htmx:beforeSend": HtmxCancelableRequestDetail;
+  "htmx:beforeSwap": HtmxSwapDetail;
+  "htmx:configRequest": HtmxConfigRequestDetail;
+  "htmx:confirm": HtmxConfirmationDetail;
+  "htmx:historyCacheError": HtmxBaseDetail;
+  "htmx:historyCacheMiss": HtmxCancelableRequestDetail;
+  "htmx:historyCacheMissError": HtmxCancelableRequestDetail;
+  "htmx:historyCacheMissLoad": HtmxCancelableRequestDetail;
+  "htmx:historyRestore": HtmxBaseDetail;
+  "htmx:beforeHistorySave": HtmxBaseDetail;
+  "htmx:load": HtmxLoadDetail;
+  "htmx:noSSESourceError": HtmxSseDetail;
+  "htmx:oobAfterSwap": HtmxSwapDetail;
+  "htmx:oobBeforeSwap": HtmxSwapDetail;
+  "htmx:prompt": HtmxPromptDetail;
+  "htmx:pushedIntoHistory": HtmxBaseDetail;
+  "htmx:responseError": HtmxSwapDetail;
+  "htmx:sendAbort": HtmxCancelableRequestDetail;
+  "htmx:sendError": HtmxCancelableRequestDetail;
+  "htmx:sseClose": HtmxSseDetail;
+  "htmx:sseError": HtmxSseDetail;
+  "htmx:sseOpen": HtmxSseDetail;
+  "htmx:swapError": HtmxSwapDetail;
+  "htmx:targetError": HtmxCancelableRequestDetail;
+  "htmx:timeout": HtmxCancelableRequestDetail;
+  "htmx:validation:validate": HtmxValidationDetail;
+  "htmx:validation:failed": HtmxValidationDetail;
+  "htmx:validation:halted": HtmxValidationDetail;
+  "htmx:xhr:abort": HtmxCancelableRequestDetail;
+  "htmx:xhr:loadend": HtmxCancelableRequestDetail;
+  "htmx:xhr:loadstart": HtmxCancelableRequestDetail;
+  "htmx:xhr:progress": HtmxCancelableRequestDetail & { loaded?: number; total?: number; lengthComputable?: boolean };
+  "htmx:xhr:error": HtmxCancelableRequestDetail;
+  "htmx:wsAfterMessage": HtmxWsDetail;
+  "htmx:wsBeforeMessage": HtmxWsDetail;
+  "htmx:wsClose": HtmxWsDetail;
+  "htmx:wsError": HtmxWsDetail;
+  "htmx:wsOpen": HtmxWsDetail;
+}
+
+type HtmxCustomEventMap = {
+  [K in keyof HtmxEventDetailMap]: CustomEvent<HtmxEventDetailMap[K]>;
+};
+
+interface DocumentEventMap extends HtmxCustomEventMap {}
+
+interface HTMLElementEventMap extends HtmxCustomEventMap {}
+
+interface WindowEventMap extends HtmxCustomEventMap {}

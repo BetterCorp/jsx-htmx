@@ -78,6 +78,22 @@ HTMX v2 uses `hx-on:*` attributes rather than the old `hx-on` form.
 </button>
 ```
 
+### Typed HTMX DOM events
+
+`jsx-htmx` also augments the DOM event maps for HTMX events, so browser listeners get typed `event.detail` automatically.
+
+```ts
+document.body.addEventListener("htmx:responseError", (event) => {
+  console.log(event.detail.xhr.status);
+  console.log(event.detail.failed);
+});
+
+document.body.addEventListener("htmx:configRequest", (event) => {
+  console.log(event.detail.headers);
+  console.log(event.detail.parameters);
+});
+```
+
 ### Inline CSS and JS
 
 For small inline blocks:
@@ -102,6 +118,8 @@ import { css, js } from "jsx-htmx";
   })}
 </script>
 ```
+
+`js(() => { ... })` is type-checked while authoring, and is intended for small inline snippets rather than large serialized application logic.
 
 ## Component Creation
 
