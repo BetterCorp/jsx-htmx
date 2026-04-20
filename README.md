@@ -1,45 +1,44 @@
 # jsx-htmx
 
-## Why?
+Type-safe HTML and HTMX v4 templates using TypeScript.
 
-Simply put, I needed an htmx JSX library that did not (1) globally override the JSX namespace and (2) did not use `///` require anywhere.  
-Both those meant that your whole project would be subject to those imports.  
-Where all I wanted was to be able to import a library and reference with jsx to get type same html/htmx AND be able to still use React/React.email elsewhere - while still being fully typesafe.
+This branch tracks the `htmx.org@next` line, currently `4.0.0-beta2`.
 
-[![npm](https://img.shields.io/npm/v/jsx-htmx?style=flat-square)](https://www.npmjs.com/package/jsx-htmx)  
-[![asciicast](https://asciinema.org/a/598553.svg)](https://asciinema.org/a/598553) (example from original design by Desdaemon - typed-htmx)
+## Why
 
-Definitions for HTML + HTMX v2 attributes in JSX.
+I wanted an htmx-focused JSX library that:
 
-This major version targets HTMX v2.
+- does not globally replace the JSX namespace
+- does not rely on triple-slash references
+- can coexist with React or other JSX runtimes in the same repo
+- keeps htmx attributes and events typed
 
-- Legacy `hx-on` is not included.
-- SSE and WebSocket support are modeled as extensions via `hx-ext`, `sse-connect`, `sse-swap`, `ws-connect`, and `ws-send`.
-- For inline styles and scripts, prefer `css(...)` and `js(...)`.
+## Scope
 
-## Usage
+`jsx-htmx` can be used in two ways:
 
-You can configure `jsx-htmx` either as pure type declarations, or as a JSX
-templating engine.
+- as JSX typings only
+- as a small JSX-to-HTML templating runtime
 
-### As type declarations
+This package does not bundle `htmx` itself. Install `htmx.org@next` separately when you need the browser runtime.
 
-Configure your `tsconfig.json` as follows:
+Any htmx attribute name that contains `:` must be written through a spread object in JSX:
 
-```jsonc
-{
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "moduleResolution": "node"
-  }
-}
+```tsx
+<button {...{ "hx-status:422": "target:#errors" }} />
 ```
 
-This library was designed for use with commonjs.
+Use direct JSX props only for names that are valid JSX identifiers, such as `hx-get`, `hx-post`, or the WebSocket alias props `hx-ws-connect` / `hx-ws-send`.
 
-#### Importing/using this:
+## Install
 
-Either by defining it globally in your tsconfig file:
+```bash
+npm install jsx-htmx htmx.org@next
+```
+
+## Type Setup
+
+`tsconfig.json`:
 
 ```jsonc
 {
@@ -51,133 +50,198 @@ Either by defining it globally in your tsconfig file:
 }
 ```
 
-OR Directly in the tsx/jsx files:
+Or per file:
 
-```jsx
+```tsx
 /** @jsxImportSource jsx-htmx */
 
-function MyComponent({ children }) {
-  return <div hx-get="/asd">{children}</div>;
-  //          ^?: string | undefined
+export function Example() {
+  return <button hx-get="/messages">Load</button>;
 }
 ```
 
-### HTMX v2 event handlers
+## Runtime Helpers
 
-HTMX v2 uses `hx-on:*` attributes rather than the old `hx-on` form.
+The runtime exports:
 
-```tsx
-<button
-  hx-post="/save"
-  {...{
-    "hx-on:htmx:before-request": "console.log('saving')",
-    "hx-on::after-request": "console.log('saved')",
-  }}
->
-  Save
-</button>
-```
+- `createElement`
+- `html`
+- `css`
+- `js`
+- `jsxConfig`
 
-### Typed HTMX DOM events
+`hx-config`, `hx-vals`, and `hx-headers` support object literals and are serialized to JSON automatically. Their `data-hx-*` forms are supported too.
 
-`jsx-htmx` also augments the DOM event maps for HTMX events, so browser listeners get typed `event.detail` automatically.
+## HTMX v4 Support
 
-```ts
-document.body.addEventListener("htmx:responseError", (event) => {
-  console.log(event.detail.xhr.status);
-  console.log(event.detail.failed);
-});
+This branch targets htmx v4 semantics, including:
 
-document.body.addEventListener("htmx:configRequest", (event) => {
-  console.log(event.detail.headers);
-  console.log(event.detail.parameters);
-});
-```
+- `hx-action` + `hx-method`
+- `hx-config`
+- `hx-ignore` and the reassigned `hx-disable`
+- explicit inheritance modifiers like `:inherited` and `:append`
+- status-code rules via `hx-status:*`
+- typed v4 DOM events like `htmx:config:request`, `htmx:before:request`, `htmx:error`
+- SSE attributes `hx-sse:connect` and `hx-sse:close`
+- WebSocket attributes `hx-ws:connect` and `hx-ws:send`
+- JSX-friendly WebSocket aliases `hx-ws-connect` and `hx-ws-send`
 
-### Inline CSS and JS
+## Examples
 
-For small inline blocks:
+### `hx-action` and `hx-method`
 
 ```tsx
 /** @jsxImportSource jsx-htmx */
-import { css, js } from "jsx-htmx";
 
-<style>
-  {css({
-    ".bp-shell": {
-      display: "grid",
-      gap: "1rem",
-    },
-  })}
-</style>
-
-<script>
-  {js(() => {
-    const shell = document.querySelector(".bp-shell");
-    shell?.setAttribute("data-ready", "true");
-  })}
-</script>
+export function SaveButton() {
+  return (
+    <button hx-method="POST" hx-action="/messages">
+      Save
+    </button>
+  );
+}
 ```
 
-`js(() => { ... })` is type-checked while authoring, and is intended for small inline snippets rather than large serialized application logic.
+### Explicit inheritance
 
-## Component Creation
+```tsx
+/** @jsxImportSource jsx-htmx */
 
-There are 2 types to make things easier:  
-`CustomComponent` and `SimpleCustomComponent`.
-
-The difference is the CustomComponent contains a type property which you can extend for default props you want to always passthrough instead of re-declaring them.
-
-EG: `SimpleCustomComponent`
-
-```ts  
-const Badge: SimpleCustomComponent = (props) => {
-  return <div class="component">{props.children}</div>;
-};
+export function Toolbar() {
+  return (
+    <section
+      {...{
+        "hx-target:inherited": "#panel",
+        "hx-headers:inherited": { "X-CSRF": "token" },
+      }}
+    >
+      <button hx-get="/inbox">Inbox</button>
+      <button hx-get="/archive">Archive</button>
+    </section>
+  );
+}
 ```
 
-EG: `CustomComponent`
+### `hx-status:*`
 
-```ts  
-type MyParams = {
-  userName: string;
-};
-type MyComponentType<Props = null> = CustomComponent<MyParams, Props>;
-type MyComponentTypeUser<Props = null> = CustomComponent<
-  MyParams & { id: string },
-  Props
->;
+```tsx
+/** @jsxImportSource jsx-htmx */
 
-const Badge: MyComponentType = (props) => {
-  return <div class="component">{props.userName}</div>;
-};
-
-const Badge2: MyComponentType<{ id: string }> = (props) => {
+export function SignupForm() {
   return (
-    <div class="component2">
-      {props.userName} - {props.id}
-    </div>
+    <>
+      <form
+        hx-post="/signup"
+        hx-target="#result"
+        {...{
+          "hx-status:422": "target:#errors",
+          "hx-status:500": "target:#server-error",
+        }}
+      >
+        <input name="email" type="email" />
+        <button type="submit">Sign up</button>
+      </form>
+      <div id="errors" />
+      <div id="result" />
+      <div id="server-error" />
+    </>
   );
-};
-
-const Badge3: MyComponentTypeUser = (props) => {
-  return (
-    <div class="component2">
-      {props.userName} - {props.id}
-    </div>
-  );
-};
-
-const Content: SimpleCustomComponent = (props) => {
-  return (
-    <div class="component">
-      <MyComponentType userName="USER" id={"id"} />
-    </div>
-  );
-};
+}
 ```
 
-# Original sources/attributions:
+### `hx-config`, `hx-vals`, `hx-headers`
 
-[typed-htmx](https://github.com/Desdaemon/typed-htmx)  
-[typed-html](https://github.com/nicojs/typed-html)
+```tsx
+/** @jsxImportSource jsx-htmx */
+
+export function ConfiguredRequest() {
+  return (
+    <button
+      hx-post="/api/messages"
+      hx-config={{ timeout: 5000, validate: false }}
+      hx-vals={{ page: 2, draft: true }}
+      hx-headers={{ "X-Feature": "inbox" }}
+    >
+      Send
+    </button>
+  );
+}
+```
+
+### Typed htmx DOM events
+
+```ts
+document.body.addEventListener("htmx:config:request", (event) => {
+  event.detail.ctx.request.headers = {
+    ...event.detail.ctx.request.headers,
+    Authorization: "Bearer token",
+  };
+});
+
+document.body.addEventListener("htmx:error", (event) => {
+  console.error(event.detail.ctx.status, event.detail.error);
+});
+```
+
+### SSE
+
+```tsx
+/** @jsxImportSource jsx-htmx */
+
+export function Notifications() {
+  return (
+    <div
+      hx-swap="beforeend"
+      {...{
+        "hx-sse:connect": "/notifications",
+        "hx-sse:close": "done",
+      }}
+    >
+      Waiting...
+    </div>
+  );
+}
+```
+
+### WebSockets
+
+```tsx
+/** @jsxImportSource jsx-htmx */
+
+export function Chat() {
+  return (
+    <div {...{ "hx-ws:connect": "/chat" }}>
+      <div id="messages" hx-target="this" hx-swap="beforeend" />
+      <form {...{ "hx-ws:send": true }}>
+        <input name="message" />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  );
+}
+```
+
+## Notes For HTMX 2 Users
+
+This is a breaking-major track.
+
+Notable htmx v4 changes outside this package:
+
+- requests use `fetch()` rather than `XMLHttpRequest`
+- inheritance is explicit by default
+- error responses swap by default unless disabled
+- `hx-ext`, `hx-request`, `hx-history`, `hx-history-elt`, `hx-params`, `hx-prompt`, and `hx-vars` are removed
+- `hx-ignore` replaces the old "disable htmx processing" meaning of `hx-disable`
+- `HX-Source` / `HX-Target` replace the old trigger-centric header model, and htmx 4 now includes element names in those identifiers when present
+
+If you still need the v2 surface, stay on the v2 branch / release line.
+
+## Source Of Truth
+
+This package’s v4 typings were aligned against:
+
+- `htmx.org@next` package contents, especially `dist/htmx.d.ts`
+- shipped extension source in `dist/ext/*`
+- official htmx v4 docs and migration guide
+
+When docs and shipped beta source disagree, this package prefers the shipped `htmx.org@next` behavior.

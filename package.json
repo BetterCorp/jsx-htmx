@@ -1,7 +1,7 @@
 {
   "name": "jsx-htmx",
-  "version": "2.0.1",
-  "description": "Type-safe HTML and HTMX v2 templates using TypeScript.",
+  "version": "4.0.0-beta2",
+  "description": "Type-safe HTML and HTMX v4 templates using TypeScript.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/BetterCorp/jsx-htmx.git"

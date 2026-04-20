@@ -16,13 +16,14 @@ declare module "jsx-htmx" {
   type CssRules = Record<string, CssDeclaration | undefined>;
 
   type AttributeValue = number | string | Date | boolean | string[] | RawText;
+  type ChildContent = string | RawText | ChildContent[];
 
   interface Children {
-    children?: AttributeValue | AttributeValue[];
+    children?: AttributeValue | ChildContent[];
   }
 
   interface CustomElementHandler {
-    (attributes: Attributes & Children, contents: Array<string | RawText>): string;
+    (attributes: Attributes & Children, contents: ChildContent[]): string;
   }
 
   interface Attributes {
@@ -82,8 +83,8 @@ declare module "jsx-htmx" {
 
   function createElement(
     name: string | CustomElementHandler,
-    attributes: (Attributes & Children) | undefined = {},
-    ...contents: Array<string | RawText>
+    attributes?: (Attributes & Children) | undefined,
+    ...contents: ChildContent[]
   ): string;
 
   const jsxConfig: JsxConfig;
@@ -167,7 +168,12 @@ declare module "jsx-htmx/jsx-runtime" {
       tabindex?: string | number;
       title?: string;
       translate?: TranslateValue;
-      [dataAttr: `data-${string}`]: string | number | boolean | undefined;
+      [dataAttr: `data-${string}`]:
+        | string
+        | number
+        | boolean
+        | Record<PropertyKey, unknown>
+        | undefined;
       [ariaAttr: `aria-${string}`]:
         | string
         | number
@@ -726,27 +732,52 @@ declare module "jsx-htmx/jsx-runtime" {
      * @module
      */
 
-    /**
-     * Either `"true"` or `"false"`.
-     */
     type BoolStr = "true" | "false";
     type AnyStr = string & {};
+    type HxJson =
+      | AnyStr
+      | "javascript:"
+      | "js:"
+      | Record<PropertyKey, unknown>;
+    type HxConfig = AnyStr | Record<PropertyKey, unknown>;
+    type HxRequestMethod =
+      | "get"
+      | "post"
+      | "put"
+      | "patch"
+      | "delete"
+      | "GET"
+      | "POST"
+      | "PUT"
+      | "PATCH"
+      | "DELETE";
     type HxSwap =
       | "innerHTML"
       | "outerHTML"
+      | "textContent"
+      | "before"
       | "beforebegin"
+      | "prepend"
       | "afterbegin"
+      | "append"
       | "beforeend"
+      | "after"
       | "afterend"
       | "delete"
       | "none"
       | "morph"
-      | "morphdom";
+      | "morph:outerHTML"
+      | "morph:innerHTML";
 
-    /**
-     * Either `this` which refers to the element itself, or a modifier followed by a CSS selector, e.g. `closest form`.
-     */
-    type HxTarget = "this" | "closest " | "find " | "next " | "previous ";
+    type HxTarget =
+      | "this"
+      | "closest "
+      | "find "
+      | "next"
+      | "next "
+      | "previous"
+      | "previous ";
+    type HxSelectorTarget = HxTarget | AnyStr;
 
     /**
      * A CSS selector, followed by one of these sync strategies, e.g. `form:abort`.
@@ -760,9 +791,6 @@ declare module "jsx-htmx/jsx-runtime" {
       | ":queue last"
       | ":queue all";
 
-    /**
-     * An event followed by one of these modifiers, e.g. `click once`.
-     */
     type HxTriggerModifier =
       | " once"
       | " changed"
@@ -775,182 +803,67 @@ declare module "jsx-htmx/jsx-runtime" {
       | " queue:last"
       | " queue:all"
       | " queue:none";
+    type HxDisable = HxSelectorTarget;
+    type HxPreload =
+      | boolean
+      | "mousedown"
+      | "mouseover"
+      | "touchstart"
+      | "always"
+      | AnyStr;
+    type HxStatusRule = "none" | `target:${string}` | `swap:${string}` | AnyStr;
+    type HtmxModifierValue = string | boolean | undefined;
 
     /**
-     * An extensible directory of htmx extensions.
-     *
-     * ### Declaring a new extension
-     *
-     * ```tsx twoslash
-     * // in foo.d.ts:
-     *
-     * declare global {
-     *     namespace JSX {
-     *         interface HtmxExtensions {
-     *             myExtension: "my-extension";
-     *         }
-     *         interface HtmlTag {
-     *             /** Describe your attribute *\/
-     *             ["my-extension-attr"]?: string;
-     *             // Add any other attributes your extension uses here
-     *         }
-     *     }
-     * }
-     *
-     * <div hx-ext="my-extension">
-     *   <span my-extension-attr="foo">Hello</span>
-     * </div>
-     * ```
+     * Names for official htmx v4 extensions bundled in `htmx.org@next`.
+     * Extensions are page-wide in v4 and loaded via script imports or config allowlists.
      */
     interface HtmxBuiltinExtensions {
-      /**
-       * Includes the commonly-used `X-Requested-With` header that identifies ajax requests in many backend frameworks.
-       *
-       * CDN: https://unpkg.com/htmx.org/dist/ext/ajax-header.js
-       * @see https://htmx.org/extensions/ajax-header/
-       */
-      ajaxHeaders: "ajax-headers";
-      /**
-       * Server-Sent Events.
-       *
-       * CDN: https://unpkg.com/htmx.org/dist/ext/sse.js
-       * @see https://htmx.org/extensions/server-sent-events/
-       */
-      serverSentEvents: "sse";
-      /**
-       * WebSockets support.
-       *
-       * CDN: https://unpkg.com/htmx.org/dist/ext/ws.js
-       * @see https://htmx.org/extensions/web-sockets/
-       */
+      alpineCompat: "alpine-compat";
+      browserIndicator: "browser-indicator";
+      compat: "compat";
+      download: "download";
+      head: "hx-head";
+      historyCache: "history-cache";
+      optimistic: "hx-optimistic";
+      preload: "preload";
+      ptag: "ptag";
+      sse: "sse";
+      targets: "hx-targets";
+      upsert: "upsert";
       ws: "ws";
-      /**
-       * Class utilities.
-       *
-       * CDN: https://unpkg.com/htmx.org/dist/ext/class-tools.js
-       * @see https://htmx.org/extensions/class-tools/
-       */
-      classTools: "class-tools";
-      /**
-       * Tool for debugging htmx requests.
-       *
-       * CDN: https://unpkg.com/htmx.org/dist/ext/debug.js
-       * @see https://htmx.org/extensions/debug/
-       */
-      debug: "debug";
-      /**
-       * Disable elements during requests.
-       *
-       * CDN: https://unpkg.com/htmx.org/dist/ext/disable-element.js
-       * @see https://htmx.org/extensions/disable-element/
-       */
-      disableElement: "disable-element";
-      /**
-       * Includes a JSON serialized version of the triggering event, if any.
-       *
-       * CDN: https://unpkg.com/htmx.org/dist/ext/event-header.js
-       * @see https://htmx.org/extensions/event-header/
-       */
-      eventHeader: "event-header";
-      /**
-       * Support for adding tags to `<head>`.
-       *
-       * CDN: https://unpkg.com/htmx.org/dist/ext/head-support.js
-       * @see https://htmx.org/extensions/head-support/
-       */
-      headSupport: "head-support";
-      /**
-       * Support for [Idiomorph](https://github.com/bigskysoftware/idiomorph), an alternative swapping mechanism for htmx.
-       *
-       * CDN: https://unpkg.com/idiomorph/dist/idiomorph-ext.min.js
-       * @see https://github.com/bigskysoftware/idiomorph#htmx
-       */
-      idiomorph: "morph";
-      /**
-       * Use JSON encoding in the body of requests, rather than the default `x-www-form-urlencoded`.
-       *
-       * CDN: https://unpkg.com/htmx.org/dist/ext/json-enc.js
-       * @see https://htmx.org/extensions/json-enc/
-       */
-      jsonEncode: "json-enc";
-      /**
-       * Support for inflight loading states.
-       *
-       * CDN: https://unpkg.com/htmx.org/dist/ext/loading-states.js
-       * @see https://htmx.org/extensions/loading-states/
-       */
-      loadingStates: "loading-states";
-      /**
-       * Support for [morphdom](https://github.com/patrick-steele-idem/morphdom),
-       * an alternative swapping mechanism for htmx.
-       *
-       * CDN: https://unpkg.com/htmx.org/dist/ext/morphdom-swap.js
-       * @see https://htmx.org/extensions/morphdom-swap/
-       */
-      morphdom: "morphdom";
     }
 
     /**
-     * Definitions for HTMX v2 attributes and common official extensions.
+     * Definitions for HTMX v4 attributes and commonly used official extensions.
      */
     interface HtmxAttributes {
       /** @ignore For React compatibility only. */
       children?: {};
       /** @ignore For React compatibility only. */
       key?: {};
-      /**
-       * Issues a `GET` to the specified URL.
-       * @see https://htmx.org/attributes/hx-get/
-       * @category Core
-       */
-      ["hx-get"]?: string;
-      /**
-       * Issues a `POST` to the specified URL.
-       * @see https://htmx.org/attributes/hx-post/
-       * @category Core
-       */
-      ["hx-post"]?: string;
-      /**
-       * Issues a `PUT` to the specified URL.
-       * @see https://htmx.org/attributes/hx-put/
-       */
-      ["hx-put"]?: string;
-      /**
-       * Issues a `DELETE` to the specified URL.
-       * @see https://htmx.org/attributes/hx-delete/
-       */
-      ["hx-delete"]?: string;
-      /**
-       * Issues a `PATCH` to the specified URL.
-       * @see https://htmx.org/attributes/hx-patch/
-       */
-      ["hx-patch"]?: string;
-      /**
-       * Add or remove [progressive enhancement](https://developer.mozilla.org/en-US/docs/Glossary/Progressive_Enhancement)
-       * for links and forms.
-       *
-       * @see https://htmx.org/attributes/hx-boost/
-       * @category Core
-       */
+      ["hx-action"]?: string;
       ["hx-boost"]?: BoolStr;
-      /**
-       * Handle any event with a script inline.
-       * @see https://htmx.org/attributes/hx-on/
-       * @category Core
-       * @remarks Event listeners on htmx-specific events need to be specified with a spread attribute, and
-       * 			 		are otherwise not supported in vanilla JSX.
-       * ```jsx
-       * <div {...{'hx-on::before-request': '...'}} />
-       * ```
-       * @since 1.9.3
-       */
-      ["hx-on:"]?: string;
-      /**
-       * Pushes the URL into the browser location bar, creating a new history entry.
-       * @see https://htmx.org/attributes/hx-push-url/
-       * @category Core
-       */
+      ["hx-config"]?: HxConfig;
+      ["data-hx-config"]?: HxConfig;
+      ["hx-confirm"]?: string;
+      ["hx-delete"]?: string;
+      ["hx-disable"]?: HxDisable;
+      ["hx-encoding"]?: "multipart/form-data";
+      ["hx-get"]?: string;
+      ["hx-headers"]?: HxJson;
+      ["data-hx-headers"]?: HxJson;
+      ["hx-ignore"]?: boolean | "true";
+      ["hx-include"]?: string;
+      ["hx-indicator"]?: string;
+      ["hx-method"]?: HxRequestMethod | AnyStr;
+      ["hx-optimistic"]?: string;
+      ["hx-patch"]?: string;
+      ["hx-post"]?: string;
+      ["hx-preload"]?: HxPreload;
+      ["hx-preserve"]?: boolean | "true";
       ["hx-push-url"]?: BoolStr | AnyStr;
+      ["hx-put"]?: string;
       /**
        * Select content to swap in from a response.
        * @see https://htmx.org/attributes/hx-select/
@@ -983,9 +896,45 @@ declare module "jsx-htmx/jsx-runtime" {
        * @see https://htmx.org/attributes/hx-target/
        * @category Core
        */
-      ["hx-target"]?: HxTarget | AnyStr;
+      ["hx-target"]?: HxSelectorTarget;
+      ["hx-targets"]?: string;
       /**
        * Specifies the event that triggers the request.
+       *
+       * A trigger is only meaningful when paired with an action attribute
+       * (`hx-get`, `hx-post`, `hx-put`, `hx-patch`, `hx-delete`) on this
+       * element **or** inherited from a parent via `:inherited`.
+       * A trigger with no associated action is a no-op.
+       *
+       * **Modifiers** (space-separated after event name):
+       * - `once` — fire only once
+       * - `changed` — fire only when value changes
+       * - `delay:<time>` — debounce (e.g. `delay:500ms`)
+       * - `throttle:<time>` — throttle (e.g. `throttle:1s`)
+       * - `from:<selector>` — listen on a different element
+       * - `target:<selector>` — filter by event target
+       * - `consume` — call `stopPropagation()`
+       * - `queue:<first|last|all|none>` — queue strategy
+       *
+       * **Polling:** `every <time>` for periodic requests (e.g. `every 2s`).
+       *
+       * @example
+       * ```tsx
+       * // Standard trigger
+       * <button hx-get="/api" hx-trigger="click">Go</button>
+       *
+       * // Debounced search
+       * <input hx-post="/search" hx-trigger="keyup changed delay:500ms" />
+       *
+       * // Polling
+       * <div hx-get="/feed" hx-trigger="every 2s">Live</div>
+       *
+       * // Inherited action — trigger on child, action on parent via :inherited
+       * <div hx-get:inherited="/data">
+       *   <button hx-trigger="click">Fires parent's GET</button>
+       * </div>
+       * ```
+       *
        * @see https://htmx.org/attributes/hx-trigger/
        * @category Core
        */
@@ -995,102 +944,13 @@ declare module "jsx-htmx/jsx-runtime" {
        * @see https://htmx.org/attributes/hx-params/
        * @category Core
        */
-      ["hx-vals"]?:
-        | AnyStr
-        | "javascript:"
-        | "js:"
-        | Record<PropertyKey, unknown>;
-      /**
-       * Shows a `confirm()` dialog before issuing a request.
-       * @see https://htmx.org/attributes/hx-confirm/
-       */
-      ["hx-confirm"]?: string;
-      /**
-       * Disables htmx processing for the given node and any children nodes.
-       * @see https://htmx.org/attributes/hx-disable/
-       */
-      ["hx-disable"]?: boolean;
-      /**
-       * Control and disable automatic attribute inheritance for child nodes.
-       * @see https://htmx.org/attributes/hx-disinherit/
-       */
-      ["hx-disinherit"]?: "*" | AnyStr;
-      /**
-       * Changes the request encoding type.
-       * @see https://htmx.org/attributes/hx-encoding/
-       */
-      ["hx-encoding"]?: "multipart/form-data";
-      /**
-       * Extensions to use for this element.
-       * @see https://htmx.org/attributes/hx-ext/
-       * @see {@linkcode HtmxBuiltinExtensions} for how to declare extensions in JSX.
-       */
-      ["hx-ext"]?:
-        | JSX.HtmxExtensions[keyof JSX.HtmxExtensions]
-        | "ignore:"
-        | AnyStr;
-      /**
-       * Adds to the headers that will be submitted with the request.
-       * @see https://htmx.org/attributes/hx-headers/
-       */
-      ["hx-headers"]?:
-        | AnyStr
-        | "javascript:"
-        | "js:"
-        | Record<PropertyKey, unknown>;
-      /**
-       * Prevent sensitive data being saved to the history cache.
-       * @see https://htmx.org/attributes/hx-history/
-       */
-      ["hx-history"]?: "false";
-      /**
-       * The element to snapshot and restore during history navigation.
-       * @see https://htmx.org/attributes/hx-history-elt/
-       */
-      ["hx-history-elt"]?: boolean;
-      /**
-       * Include additional data in requests.
-       * @see https://htmx.org/attributes/hx-include/
-       */
-      ["hx-include"]?: string;
-      /**
-       * The element to put the `htmx-request` class on during the request.
-       * @see https://htmx.org/attributes/hx-indicator/
-       */
-      ["hx-indicator"]?: string;
-      /**
-       * Filters the parameters that will be submitted with a request.
-       * @see https://htmx.org/attributes/hx-params/
-       */
-      ["hx-params"]?: "*" | "none" | "not " | AnyStr;
-      /**
-       * Specifies elements to keep unchanged between requests.
-       * @see https://htmx.org/attributes/hx-preserve/
-       * @remarks `true` is only observed by the `head-support` extension,
-       * 			 		where it prevents an element from being removed from the `<head>`.
-       */
-      ["hx-preserve"]?: boolean | "true";
-      /**
-       * Shows a `prompt()` before submitting a request.
-       * @see https://htmx.org/attributes/hx-prompt/
-       */
-      ["hx-prompt"]?: string;
+      ["hx-vals"]?: HxJson;
+      ["data-hx-vals"]?: HxJson;
       /**
        * Replace the URL in the browser location bar.
        * @see https://htmx.org/attributes/hx-replace-url/
        */
       ["hx-replace-url"]?: BoolStr | AnyStr;
-      /**
-       * Configures various aspects of the request.
-       * @see https://htmx.org/attributes/hx-request/
-       */
-      ["hx-request"]?:
-        | '"timeout":'
-        | '"credentials":'
-        | '"noHeaders":'
-        | "javascript:"
-        | "js:"
-        | AnyStr;
       /**
        * Control how requests made by different elements are synchronized.
        * @see https://htmx.org/attributes/hx-sync/
@@ -1102,46 +962,17 @@ declare module "jsx-htmx/jsx-runtime" {
        */
       ["hx-validate"]?: boolean;
       /**
-       * Adds values dynamically to the parameters to submit with the request.
-       * @deprecated superseded by `hx-vals`
-       */
-      ["hx-vars"]?: AnyStr;
-      /**
-       * The URL of the SSE server.
-       * @see https://htmx.org/extensions/server-sent-events/
-       */
-      ["sse-connect"]?: string;
-      /**
-       * The name of the message to swap into the DOM.
-       * @see https://htmx.org/extensions/server-sent-events/
-       */
-      ["sse-swap"]?: string;
-      /**
-       * A URL to establish a WebSocket connection against.
-       * @see https://htmx.org/extensions/web-sockets/
-       */
-      ["ws-connect"]?: string;
-      /**
-       * Sends a message to the nearest websocket based on the trigger value for the element.
-       * @see https://htmx.org/extensions/web-sockets/
-       */
-      ["ws-send"]?: boolean;
-      /**
-       * Apply class transitions on this element.
-       * @see https://htmx.org/extensions/class-tools/
-       */
-      ["classes"]?: "add " | "remove " | "toggle " | AnyStr;
-      /**
-       * The element or elements to disable during requests.
-       * Accepts CSS selectors.
-       * @see https://htmx.org/extensions/disable-element/
-       */
-      ["hx-disable-element"]?: "self" | AnyStr;
-      /**
        * The strategy for merging new head content.
        * @see https://htmx.org/extensions/head-support/
        */
       ["hx-head"]?: "merge" | "append" | "re-eval";
+      ["hx-ptag"]?: AnyStr;
+      ["hx-sse:connect"]?: string;
+      ["hx-sse:close"]?: string;
+      ["hx-ws:connect"]?: string;
+      ["hx-ws:send"]?: boolean | string;
+      ["hx-ws-connect"]?: string;
+      ["hx-ws-send"]?: boolean | string;
       /**
        * Attach [hyperscript](https://hyperscript.org/docs) behavior to this element.
        * Available separately from htmx.
@@ -1168,6 +999,310 @@ declare module "jsx-htmx/jsx-runtime" {
        * @see https://htmx.org/attributes/hx-on/
        */
       [key: `hx-on::${string}`]: string | undefined;
+      /**
+       * Handle responses by HTTP status code.
+       *
+       * Use `hx-status:<code>` to define behavior for specific status codes.
+       * Values: `none`, `target:<selector>`, `swap:<strategy>`, or any string.
+       *
+       * @example
+       * ```tsx
+       * <div hx-get="/api" hx-status:404="target:#error-panel" hx-status:500="swap:none">
+       *   Content
+       * </div>
+       * ```
+       *
+       * @see https://htmx.org/attributes/hx-status/
+       */
+      [key: `hx-status:${string}`]: HxStatusRule | undefined;
+
+      // ── Inheritance modifiers ─────────────────────────────────────
+      //
+      // HTMX v4 uses explicit inheritance via the `:inherited` suffix.
+      // Place `:inherited` on a parent to pass that attribute's value to children.
+      // Use `:append` to append to a parent's inherited value instead of replacing it.
+      // Combine as `:inherited:append` to both inherit and append.
+      //
+      // Known attributes are listed explicitly below for autocomplete and
+      // hover documentation. The fallback index signatures at the end allow
+      // custom extension attributes — extend `HtmxAttributes` via declaration
+      // merging to add typed modifiers for extension-specific attributes.
+
+      // ── :inherited — pass attribute value to child elements ──
+
+      /**
+       * Inherit `hx-boost` to all descendant links and forms.
+       * Children use AJAX navigation without needing their own `hx-boost`.
+       *
+       * @example `<div hx-boost:inherited="true">` → all child `<a>`/`<form>` elements are boosted.
+       * @see https://htmx.org/attributes/hx-boost/
+       */
+      ["hx-boost:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-confirm` to child elements.
+       * Children will show a confirmation dialog before issuing requests.
+       *
+       * @see https://htmx.org/attributes/hx-confirm/
+       */
+      ["hx-confirm:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-delete` to child elements.
+       * Children can trigger this DELETE endpoint without their own `hx-delete`.
+       *
+       * @see https://htmx.org/attributes/hx-delete/
+       */
+      ["hx-delete:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-encoding` to child elements.
+       * Children will use this encoding for their requests (e.g. `multipart/form-data`).
+       *
+       * @see https://htmx.org/attributes/hx-encoding/
+       */
+      ["hx-encoding:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-get` to child elements.
+       * Children can trigger this GET endpoint via their own `hx-trigger`.
+       *
+       * @example
+       * ```tsx
+       * <div hx-get:inherited="/api/data">
+       *   <button hx-trigger="click">Fires GET /api/data</button>
+       * </div>
+       * ```
+       *
+       * @see https://htmx.org/attributes/hx-get/
+       */
+      ["hx-get:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-headers` to child elements.
+       * Children will include these headers in their requests.
+       * Combine with `:append` to merge child headers with parent headers.
+       *
+       * @see https://htmx.org/attributes/hx-headers/
+       */
+      ["hx-headers:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-include` to child elements.
+       * Children will include the specified selector's values in requests.
+       *
+       * @see https://htmx.org/attributes/hx-include/
+       */
+      ["hx-include:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-indicator` to child elements.
+       * Children will use this element as their loading indicator.
+       *
+       * @see https://htmx.org/attributes/hx-indicator/
+       */
+      ["hx-indicator:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-method` to child elements.
+       * Children will use this HTTP method for their requests.
+       *
+       * @see https://htmx.org/attributes/hx-method/
+       */
+      ["hx-method:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-patch` to child elements.
+       * Children can trigger this PATCH endpoint via their own `hx-trigger`.
+       *
+       * @see https://htmx.org/attributes/hx-patch/
+       */
+      ["hx-patch:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-post` to child elements.
+       * Children can trigger this POST endpoint via their own `hx-trigger`.
+       *
+       * @see https://htmx.org/attributes/hx-post/
+       */
+      ["hx-post:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-push-url` to child elements.
+       * Children will push their request URL to browser history.
+       *
+       * @see https://htmx.org/attributes/hx-push-url/
+       */
+      ["hx-push-url:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-put` to child elements.
+       * Children can trigger this PUT endpoint via their own `hx-trigger`.
+       *
+       * @see https://htmx.org/attributes/hx-put/
+       */
+      ["hx-put:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-replace-url` to child elements.
+       * Children will replace the browser URL on request.
+       *
+       * @see https://htmx.org/attributes/hx-replace-url/
+       */
+      ["hx-replace-url:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-select` to child elements.
+       * Children will select the same fragment from responses.
+       *
+       * @see https://htmx.org/attributes/hx-select/
+       */
+      ["hx-select:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-select-oob` to child elements.
+       * Children will use the same out-of-band select strategy.
+       *
+       * @see https://htmx.org/attributes/hx-select-oob/
+       */
+      ["hx-select-oob:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-swap` to child elements.
+       * Children will use this swap strategy (e.g. `outerHTML`, `innerHTML`).
+       *
+       * @see https://htmx.org/attributes/hx-swap/
+       */
+      ["hx-swap:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-swap-oob` to child elements.
+       *
+       * @see https://htmx.org/attributes/hx-swap-oob/
+       */
+      ["hx-swap-oob:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-sync` to child elements.
+       * Children will use this synchronization strategy.
+       *
+       * @see https://htmx.org/attributes/hx-sync/
+       */
+      ["hx-sync:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-target` to child elements.
+       * All child HTMX requests will swap into this target.
+       *
+       * @example `<div hx-target:inherited="#results">` → children swap into `#results`.
+       * @see https://htmx.org/attributes/hx-target/
+       */
+      ["hx-target:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-trigger` to child elements.
+       * Children will use this trigger event unless they define their own.
+       *
+       * @see https://htmx.org/attributes/hx-trigger/
+       */
+      ["hx-trigger:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-vals` to child elements.
+       * Children will include these values in their request parameters.
+       * Combine with `:append` to merge child values with parent values.
+       *
+       * @see https://htmx.org/attributes/hx-vals/
+       */
+      ["hx-vals:inherited"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-validate` to child elements.
+       * Children will validate before issuing requests.
+       *
+       * @see https://htmx.org/attributes/hx-validate/
+       */
+      ["hx-validate:inherited"]?: HtmxModifierValue;
+
+      // ── :append — append to parent's inherited value ──
+
+      /**
+       * Append to the parent's inherited `hx-headers` value.
+       * Merges this element's headers with the parent's instead of replacing them.
+       *
+       * @example
+       * ```tsx
+       * <div hx-headers:inherited='{"Auth": "Bearer tok"}'>
+       *   <button hx-headers:append='{"X-Custom": "val"}' hx-get="/api">
+       *     Sends both Auth and X-Custom headers
+       *   </button>
+       * </div>
+       * ```
+       *
+       * @see https://htmx.org/attributes/hx-headers/
+       */
+      ["hx-headers:append"]?: HtmxModifierValue;
+      /**
+       * Append to the parent's inherited `hx-vals` value.
+       * Merges this element's values with the parent's instead of replacing them.
+       *
+       * @see https://htmx.org/attributes/hx-vals/
+       */
+      ["hx-vals:append"]?: HtmxModifierValue;
+      /**
+       * Append to the parent's inherited `hx-include` selector.
+       *
+       * @see https://htmx.org/attributes/hx-include/
+       */
+      ["hx-include:append"]?: HtmxModifierValue;
+      /**
+       * Append to the parent's inherited `hx-select` selector.
+       *
+       * @see https://htmx.org/attributes/hx-select/
+       */
+      ["hx-select:append"]?: HtmxModifierValue;
+      /**
+       * Merge this element's `hx-disable` targets with an inherited parent value.
+       *
+       * @see https://htmx.org/attributes/hx-disable/
+       */
+      ["hx-disable:merge"]?: HtmxModifierValue;
+      /**
+       * Append to the parent's inherited `hx-trigger` value.
+       * Adds trigger events to the parent's trigger list instead of replacing it.
+       *
+       * @see https://htmx.org/attributes/hx-trigger/
+       */
+      ["hx-trigger:append"]?: HtmxModifierValue;
+
+      // ── :inherited:append — inherit AND append ──
+
+      /**
+       * Inherit `hx-headers` to children AND append to parent's inherited value.
+       * The merged result flows down to descendants.
+       *
+       * @see https://htmx.org/attributes/hx-headers/
+       */
+      ["hx-headers:inherited:append"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-vals` to children AND append to parent's inherited value.
+       *
+       * @see https://htmx.org/attributes/hx-vals/
+       */
+      ["hx-vals:inherited:append"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-include` to children AND append to parent's inherited value.
+       *
+       * @see https://htmx.org/attributes/hx-include/
+       */
+      ["hx-include:inherited:append"]?: HtmxModifierValue;
+      /**
+       * Inherit `hx-trigger` to children AND append to parent's inherited value.
+       *
+       * @see https://htmx.org/attributes/hx-trigger/
+       */
+      ["hx-trigger:inherited:append"]?: HtmxModifierValue;
+
+      // ── Fallback index signatures for extension/custom attributes ──
+      // Known attributes above provide autocomplete and hover docs.
+      // These catch-alls allow custom extension attributes to use modifiers.
+      // For typed support of custom attrs, extend HtmxAttributes via declaration merging.
+
+      /**
+       * **Fallback** — Marks any `hx-*` attribute as inherited by child elements.
+       * Prefer the explicit named properties above for autocomplete and documentation.
+       *
+       * @see https://htmx.org/attributes/hx-inherit/
+       */
+      [key: `hx-${string}:inherited`]: HtmxModifierValue;
+      /**
+       * **Fallback** — Appends to a parent's inherited `hx-*` value.
+       * Prefer the explicit named properties above for autocomplete and documentation.
+       */
+      [key: `hx-${string}:append`]: HtmxModifierValue;
+      /**
+       * **Fallback** — Inherits AND appends for any `hx-*` attribute.
+       * Prefer the explicit named properties above for autocomplete and documentation.
+       */
+      [key: `hx-${string}:inherited:append`]: HtmxModifierValue;
     }
 
     interface HtmxExtensions extends HtmxBuiltinExtensions {}
@@ -1179,149 +1314,202 @@ declare module "jsx-htmx/jsx-runtime" {
   }
 }
 
-interface HtmxPathInfo {
-  requestPath?: string;
-  finalRequestPath?: string;
-  responsePath?: string | null;
-  anchor?: string | null;
-}
-
-interface HtmxRequestConfig {
-  boosted?: boolean;
-  useUrlParams?: boolean;
-  formData?: FormData;
-  parameters?: Record<string, string | string[]>;
-  unfilteredParameters?: Record<string, string | string[]>;
+interface HtmxRequestConfig extends RequestInit {
+  action?: string;
+  method?: string;
   headers?: Record<string, string>;
-  target?: Element | null;
-  verb?: string;
-  errors?: unknown[];
-  withCredentials?: boolean;
-  timeout?: number;
-  path?: string;
-  triggeringEvent?: Event;
-  elt?: Element;
+  body?: BodyInit | null;
+  validate?: boolean;
+  sse?: Record<string, unknown>;
+  ws?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
-interface HtmxBaseDetail {
+interface HtmxResponseInfo {
+  raw?: Response;
+  status?: number;
+  headers?: Headers;
+  [key: string]: unknown;
+}
+
+interface HtmxRequestContext {
+  sourceElement?: Element;
+  sourceEvent?: Event;
+  target?: Element | string | null;
+  request: HtmxRequestConfig;
+  response?: HtmxResponseInfo;
+  text?: string;
+  select?: string;
+  selectOOB?: string;
+  swap?: string;
+  push?: string | boolean;
+  replace?: string | boolean;
+  transition?: boolean;
+  confirm?: string;
+  status?: string;
+  hx?: Record<string, string>;
+  [key: string]: unknown;
+}
+
+interface HtmxElementDetail {
   elt: Element;
 }
 
-interface HtmxCancelableRequestDetail extends HtmxBaseDetail {
-  xhr: XMLHttpRequest;
-  target?: Element | null;
-  requestConfig?: HtmxRequestConfig;
-  boosted?: boolean;
-  select?: string;
-  pathInfo?: HtmxPathInfo;
+interface HtmxContextDetail {
+  ctx: HtmxRequestContext;
 }
 
-interface HtmxSwapDetail extends HtmxCancelableRequestDetail {
-  shouldSwap?: boolean;
-  ignoreTitle?: boolean;
-  swapOverride?: string;
-  selectOverride?: string;
-  serverResponse?: string;
-  isError?: boolean;
-  successful?: boolean;
-  failed?: boolean;
+interface HtmxSettleDetail {
+  task?: unknown;
+  newContent?: Element[];
+  settleTasks?: unknown[];
 }
 
-interface HtmxLoadDetail extends HtmxBaseDetail {
-  xhr: XMLHttpRequest;
-  target?: Element | null;
-  requestConfig?: HtmxRequestConfig;
-}
-
-interface HtmxConfigRequestDetail extends HtmxBaseDetail {
-  xhr: XMLHttpRequest;
-  target?: Element | null;
-  requestConfig?: HtmxRequestConfig;
+interface HtmxHistoryUpdate {
+  type?: "push" | "replace";
   path?: string;
-  verb?: string;
+}
+
+interface HtmxHistoryDetail {
+  history: HtmxHistoryUpdate;
+  sourceElement?: Element;
+  response?: HtmxResponseInfo;
+}
+
+interface HtmxPathDetail {
+  path: string;
+}
+
+interface HtmxImplicitInheritanceDetail extends HtmxElementDetail {
+  name?: string;
+  parent?: Element;
+}
+
+interface HtmxConfirmationDetail extends HtmxContextDetail {
+  issueRequest: () => void;
+  dropRequest: () => void;
+}
+
+interface HtmxErrorDetail extends HtmxContextDetail {
+  error?: unknown;
+}
+
+interface HtmxViewTransitionDetail extends HtmxContextDetail {
+  task?: (() => void) | unknown;
+}
+
+interface HtmxSseConnection {
+  url?: string;
+  attempt?: number;
+  status?: number | null;
+  lastEventId?: string | null;
+  delay?: number;
+  cancelled?: boolean;
+  [key: string]: unknown;
+}
+
+interface HtmxSseMessage {
+  data?: string;
+  event?: string;
+  id?: string;
+  cancelled?: boolean;
+  [key: string]: unknown;
+}
+
+interface HtmxSseConnectionDetail {
+  connection: HtmxSseConnection;
+}
+
+interface HtmxSseMessageDetail {
+  message: HtmxSseMessage;
+}
+
+interface HtmxSseErrorDetail {
+  error?: unknown;
+  url?: string;
+  status?: number;
+}
+
+interface HtmxSseCloseDetail {
+  connection?: HtmxSseConnection;
+  reason?: string;
+}
+
+interface HtmxWsConnection {
+  url?: string;
+  socket?: WebSocket | null;
+  attempt?: number;
+  cancelled?: boolean;
+  [key: string]: unknown;
+}
+
+interface HtmxWsRequestDetail {
   headers?: Record<string, string>;
-  parameters?: Record<string, string | string[]>;
-  unfilteredParameters?: Record<string, string | string[]>;
-  triggeringEvent?: Event;
+  body?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
-interface HtmxConfirmationDetail extends HtmxBaseDetail {
-  xhr?: XMLHttpRequest;
-  target?: Element | null;
-  path?: string;
-  verb?: string;
-  triggeringEvent?: Event;
-  question?: string;
+interface HtmxWsMessageDetail {
+  message: {
+    text?: string;
+    json?: unknown;
+    cancelled?: boolean;
+  };
 }
 
-interface HtmxPromptDetail extends HtmxBaseDetail {
-  prompt?: string | null;
-  target?: Element | null;
+interface HtmxWsCloseDetail {
+  connection?: HtmxWsConnection;
+  reason?: string;
+  code?: number | null;
+  url?: string | null;
 }
 
-interface HtmxValidationDetail extends HtmxBaseDetail {
-  message?: string;
-  validity?: ValidityState;
-}
-
-interface HtmxSseDetail extends HtmxBaseDetail {
-  source?: EventSource;
-}
-
-interface HtmxWsDetail extends HtmxBaseDetail {
-  socketWrapper?: unknown;
-  message?: unknown;
+interface HtmxWsErrorDetail {
+  url?: string | null;
+  error?: unknown;
 }
 
 interface HtmxEventDetailMap {
-  "htmx:abort": HtmxBaseDetail;
-  "htmx:afterOnLoad": HtmxLoadDetail;
-  "htmx:afterProcessNode": HtmxBaseDetail;
-  "htmx:afterRequest": HtmxSwapDetail;
-  "htmx:afterSettle": HtmxSwapDetail;
-  "htmx:afterSwap": HtmxSwapDetail;
-  "htmx:beforeCleanupElement": HtmxBaseDetail;
-  "htmx:beforeOnLoad": HtmxLoadDetail;
-  "htmx:beforeProcessNode": HtmxBaseDetail;
-  "htmx:beforeRequest": HtmxCancelableRequestDetail;
-  "htmx:beforeSend": HtmxCancelableRequestDetail;
-  "htmx:beforeSwap": HtmxSwapDetail;
-  "htmx:configRequest": HtmxConfigRequestDetail;
+  "htmx:abort": HtmxElementDetail;
+  "htmx:after:cleanup": HtmxElementDetail;
+  "htmx:after:history:push": HtmxPathDetail;
+  "htmx:after:history:replace": HtmxPathDetail;
+  "htmx:after:history:update": HtmxHistoryDetail;
+  "htmx:after:implicitInheritance": HtmxImplicitInheritanceDetail;
+  "htmx:after:init": HtmxElementDetail;
+  "htmx:after:process": HtmxElementDetail;
+  "htmx:after:request": HtmxContextDetail;
+  "htmx:after:settle": HtmxSettleDetail;
+  "htmx:after:sse:connection": HtmxSseConnectionDetail;
+  "htmx:after:sse:message": HtmxSseMessageDetail;
+  "htmx:after:swap": HtmxContextDetail;
+  "htmx:after:viewTransition": HtmxViewTransitionDetail;
+  "htmx:after:ws:connection": { connection: HtmxWsConnection };
+  "htmx:after:ws:message": HtmxWsMessageDetail;
+  "htmx:after:ws:request": HtmxWsRequestDetail;
+  "htmx:before:cleanup": HtmxElementDetail;
+  "htmx:before:history:restore": HtmxPathDetail;
+  "htmx:before:history:update": HtmxHistoryDetail;
+  "htmx:before:init": HtmxElementDetail;
+  "htmx:before:process": HtmxElementDetail;
+  "htmx:before:request": HtmxContextDetail;
+  "htmx:before:response": HtmxContextDetail;
+  "htmx:before:settle": HtmxSettleDetail;
+  "htmx:before:sse:connection": HtmxSseConnectionDetail;
+  "htmx:before:sse:message": HtmxSseMessageDetail;
+  "htmx:before:swap": HtmxContextDetail & { tasks?: unknown[] };
+  "htmx:before:viewTransition": HtmxViewTransitionDetail;
+  "htmx:before:ws:connection": { connection: HtmxWsConnection };
+  "htmx:before:ws:message": HtmxWsMessageDetail;
+  "htmx:before:ws:request": HtmxWsRequestDetail;
+  "htmx:config:request": HtmxContextDetail;
   "htmx:confirm": HtmxConfirmationDetail;
-  "htmx:historyCacheError": HtmxBaseDetail;
-  "htmx:historyCacheMiss": HtmxCancelableRequestDetail;
-  "htmx:historyCacheMissError": HtmxCancelableRequestDetail;
-  "htmx:historyCacheMissLoad": HtmxCancelableRequestDetail;
-  "htmx:historyRestore": HtmxBaseDetail;
-  "htmx:beforeHistorySave": HtmxBaseDetail;
-  "htmx:load": HtmxLoadDetail;
-  "htmx:noSSESourceError": HtmxSseDetail;
-  "htmx:oobAfterSwap": HtmxSwapDetail;
-  "htmx:oobBeforeSwap": HtmxSwapDetail;
-  "htmx:prompt": HtmxPromptDetail;
-  "htmx:pushedIntoHistory": HtmxBaseDetail;
-  "htmx:responseError": HtmxSwapDetail;
-  "htmx:sendAbort": HtmxCancelableRequestDetail;
-  "htmx:sendError": HtmxCancelableRequestDetail;
-  "htmx:sseClose": HtmxSseDetail;
-  "htmx:sseError": HtmxSseDetail;
-  "htmx:sseOpen": HtmxSseDetail;
-  "htmx:swapError": HtmxSwapDetail;
-  "htmx:targetError": HtmxCancelableRequestDetail;
-  "htmx:timeout": HtmxCancelableRequestDetail;
-  "htmx:validation:validate": HtmxValidationDetail;
-  "htmx:validation:failed": HtmxValidationDetail;
-  "htmx:validation:halted": HtmxValidationDetail;
-  "htmx:xhr:abort": HtmxCancelableRequestDetail;
-  "htmx:xhr:loadend": HtmxCancelableRequestDetail;
-  "htmx:xhr:loadstart": HtmxCancelableRequestDetail;
-  "htmx:xhr:progress": HtmxCancelableRequestDetail & { loaded?: number; total?: number; lengthComputable?: boolean };
-  "htmx:xhr:error": HtmxCancelableRequestDetail;
-  "htmx:wsAfterMessage": HtmxWsDetail;
-  "htmx:wsBeforeMessage": HtmxWsDetail;
-  "htmx:wsClose": HtmxWsDetail;
-  "htmx:wsError": HtmxWsDetail;
-  "htmx:wsOpen": HtmxWsDetail;
+  "htmx:error": HtmxErrorDetail;
+  "htmx:finally:request": HtmxContextDetail;
+  "htmx:sse:close": HtmxSseCloseDetail;
+  "htmx:sse:error": HtmxSseErrorDetail;
+  "htmx:ws:close": HtmxWsCloseDetail;
+  "htmx:ws:error": HtmxWsErrorDetail;
 }
 
 type HtmxCustomEventMap = {
