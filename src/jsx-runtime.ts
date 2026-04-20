@@ -23,6 +23,10 @@ export function Fragment({ children }: { children?: unknown }): Element {
 }
 
 function sanitizer(value: unknown): Element {
+  if (Array.isArray(value)) {
+    const children = value.map(sanitizer);
+    return jsxConfig.trusted ? children.join("") : new Node(children);
+  }
   if (value instanceof RawText) return value.toString();
   const str = value || value === 0 ? value.toString() : "";
   if (!jsxConfig.sanitize || jsxConfig.trusted) return str;

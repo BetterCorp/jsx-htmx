@@ -16,13 +16,14 @@ declare module "jsx-htmx" {
   type CssRules = Record<string, CssDeclaration | undefined>;
 
   type AttributeValue = number | string | Date | boolean | string[] | RawText;
+  type ChildContent = string | RawText | ChildContent[];
 
   interface Children {
-    children?: AttributeValue | AttributeValue[];
+    children?: AttributeValue | ChildContent[];
   }
 
   interface CustomElementHandler {
-    (attributes: Attributes & Children, contents: Array<string | RawText>): string;
+    (attributes: Attributes & Children, contents: ChildContent[]): string;
   }
 
   interface Attributes {
@@ -83,7 +84,7 @@ declare module "jsx-htmx" {
   function createElement(
     name: string | CustomElementHandler,
     attributes: (Attributes & Children) | undefined = {},
-    ...contents: Array<string | RawText>
+    ...contents: ChildContent[]
   ): string;
 
   const jsxConfig: JsxConfig;

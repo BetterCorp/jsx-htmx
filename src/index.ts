@@ -54,6 +54,8 @@ export class RawText {
   }
 }
 
+type ContentNode = string | RawText | ContentNode[];
+
 const isUpper = (input: string, index: number) => {
   const charCode = input.charCodeAt(index);
   return capitalACharCode <= charCode && capitalZCharCode >= charCode;
@@ -124,13 +126,15 @@ const attributesToString = (attributes: Attributes | undefined): string => {
   }
 };
 
-const contentsToString = (contents: Array<string | RawText> | undefined) => {
+const contentNodeToString = (content: ContentNode): string => {
+  return Array.isArray(content)
+    ? content.map(contentNodeToString).join("")
+    : content.toString();
+};
+
+const contentsToString = (contents: ContentNode[] | undefined) => {
   if (contents) {
-    return contents
-      .map((elements) =>
-        Array.isArray(elements) ? elements.join("") : elements
-      )
-      .join("");
+    return contents.map(contentNodeToString).join("");
   } else {
     return "";
   }
@@ -160,7 +164,7 @@ const isVoidElement = (tagName: string) => {
 export function createElement(
   name: string | CustomElementHandler,
   attributes: (Attributes & Children) | undefined = {},
-  ...contents: Array<string | RawText>
+  ...contents: ContentNode[]
 ) {
   const children = (attributes && attributes.children) || contents;
 
