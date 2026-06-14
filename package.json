@@ -67,5 +67,13 @@
   },
   "dependencies": {
     "csstype": "^3.2.3"
+  },
+  "peerDependencies": {
+    "htmx.org": "^4.0.0-beta4"
+  },
+  "peerDependenciesMeta": {
+    "htmx.org": {
+      "optional": true
+    }
   }
 }
