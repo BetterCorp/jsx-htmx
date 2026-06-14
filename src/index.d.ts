@@ -1410,7 +1410,6 @@ interface HtmxConfig {
   /** Request timeout in ms. Defaults to `60000` in htmx 4 (was `0` in htmx 2). */
   defaultTimeout: number;
   inlineScriptNonce: string;
-  inlineStyleNonce: string;
   extensions: string;
   morphIgnore: string[];
   morphScanLimit: number;
@@ -1456,6 +1455,16 @@ interface HtmxQueryProxy extends Iterable<Element> {
 interface HtmxLiveApi {
   q(selector: string | Element | ArrayLike<Element>): HtmxQueryProxy;
   take(target: HtmxElementRef, className: string, source?: HtmxElementRef): void;
+  /** Resolve on the next occurrence of `eventName`, or `null` on timeout. */
+  forEvent(
+    eventName: string,
+    timeout?: number,
+    on?: EventTarget
+  ): Promise<Event | null>;
+  /** Per-channel debounce; closure form is keyed by `fn.toString()`. */
+  debounce(ms: number, fn?: () => unknown): Promise<void> | void;
+  /** Force a recompute of all live expressions. */
+  refresh(): void;
   [key: string]: unknown;
 }
 
@@ -1492,15 +1501,8 @@ interface HtmxApi {
   /** Register an extension. Renamed from `defineExtension` in htmx 4. */
   registerExtension(name: string, extension: Record<string, unknown>): void;
   swap(context: HtmxSwapContext): Promise<void>;
-  takeClass(elt: HtmxElementRef, className: string, container?: Element): void;
   /** Resolve after `ms` milliseconds. */
   timeout(ms: number): Promise<void>;
-  /** Resolve on the next occurrence of `eventName`, or `null` on timeout. */
-  forEvent(
-    eventName: string,
-    timeout?: number,
-    on?: EventTarget
-  ): Promise<Event | null>;
   trigger(elt: HtmxElementRef, eventName: string, detail?: unknown): boolean;
   [key: string]: unknown;
 }
