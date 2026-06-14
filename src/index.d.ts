@@ -754,6 +754,7 @@ declare module "jsx-htmx/jsx-runtime" {
     type HxSwap =
       | "innerHTML"
       | "outerHTML"
+      | "outerSync"
       | "textContent"
       | "before"
       | "beforebegin"
@@ -799,14 +800,18 @@ declare module "jsx-htmx/jsx-runtime" {
       | " from:"
       | " target:"
       | " consume"
-      | " queue:first"
-      | " queue:last"
-      | " queue:all"
-      | " queue:none";
+      | " prevent"
+      | " stop"
+      | " halt"
+      | " capture"
+      | " passive"
+      | " root:"
+      | " rootMargin:"
+      | " threshold:";
     type HxDisable = HxSelectorTarget;
     type HxPreload =
       | boolean
-      | "mousedown"
+      | "mouseenter"
       | "mouseover"
       | "touchstart"
       | "always"
@@ -819,19 +824,24 @@ declare module "jsx-htmx/jsx-runtime" {
      * Extensions are page-wide in v4 and loaded via script imports or config allowlists.
      */
     interface HtmxBuiltinExtensions {
-      alpineCompat: "alpine-compat";
-      browserIndicator: "browser-indicator";
-      compat: "compat";
-      download: "download";
+      alpineCompat: "hx-alpine-compat";
+      browserIndicator: "hx-browser-indicator";
+      /** htmx 2.x compatibility shim: implicit inheritance, old event names, 4xx/5xx swap defaults. */
+      compat: "htmx-2-compat";
+      /** Content Security Policy enforcement (nonce gating, Trusted Types, safe eval). Renamed from `hx-nonce` in beta4. */
+      csp: "hx-csp";
+      download: "hx-download";
       head: "hx-head";
-      historyCache: "history-cache";
+      historyCache: "hx-history-cache";
+      /** Reactive `hx-live` expressions and the `q()` selector helper. New in beta3. */
+      live: "hx-live";
       optimistic: "hx-optimistic";
-      preload: "preload";
-      ptag: "ptag";
-      sse: "sse";
+      preload: "hx-preload";
+      ptag: "hx-ptag";
+      sse: "hx-sse";
       targets: "hx-targets";
-      upsert: "upsert";
-      ws: "ws";
+      upsert: "hx-upsert";
+      ws: "hx-ws";
     }
 
     /**
@@ -967,6 +977,31 @@ declare module "jsx-htmx/jsx-runtime" {
        */
       ["hx-head"]?: "merge" | "append" | "re-eval";
       ["hx-ptag"]?: AnyStr;
+      /**
+       * Marks the element that history content is restored into when navigating back.
+       * Defaults to `<body>` when absent. Restored from htmx 2 in htmx 4 beta3.
+       *
+       * @see https://htmx.org/attributes/hx-history-elt/
+       * @category Core
+       */
+      ["hx-history-elt"]?: boolean | "true";
+      /**
+       * A JavaScript expression that re-runs whenever the DOM changes (input/change
+       * events or mutations). Provided by the {@linkcode HtmxBuiltinExtensions.live `hx-live`} extension.
+       * Inside the expression `this` is the element and `q(...)` selects elements.
+       *
+       * @example `<output hx-live="this.textContent = 'hi ' + q('#name').value"></output>`
+       * @see https://htmx.org/extensions/hx-live/
+       */
+      ["hx-live"]?: AnyStr;
+      /**
+       * CSP nonce stamped by the server on every htmx-bearing element. The
+       * {@linkcode HtmxBuiltinExtensions.csp `hx-csp`} extension strips htmx
+       * attributes from any element whose `hx-nonce` doesn't match the page nonce.
+       *
+       * @see https://htmx.org/extensions/hx-csp/
+       */
+      ["hx-nonce"]?: AnyStr;
       ["hx-sse:connect"]?: string;
       ["hx-sse:close"]?: string;
       ["hx-ws:connect"]?: string;
@@ -981,18 +1016,39 @@ declare module "jsx-htmx/jsx-runtime" {
        */
       _?: AnyStr;
       /**
-       * Handle DOM or htmx events inline with the HTMX v2 `hx-on:*` syntax.
+       * Handle DOM or htmx events inline (simple form): one event, one expression.
        * Examples:
        * - `hx-on:click`
-       * - `hx-on:htmx:before-request`
-       * - `hx-on::after-request`
+       * - `hx-on:htmx:before:request`
+       * - `hx-on::after:request` (`::` is shorthand for `htmx:`)
        *
        * HTML attribute names are case-insensitive, so event names should use kebab-case in markup.
-       * `hx-on::event-name` is shorthand for htmx events.
        *
+       * @note In htmx 4 the dot-modifiers (`.prevent` `.stop` `.once` `.self` …) were
+       *       removed from this `hx-on:event` form. Use the {@link HtmxAttributes "hx-on" extended form}
+       *       with `->` and trigger modifiers instead.
        * @see https://htmx.org/attributes/hx-on/
        */
       [key: `hx-on:${string}`]: string | undefined;
+      /**
+       * Handle events inline with the htmx 4 **extended form**, which builds on
+       * {@link HtmxAttributes "hx-trigger"}'s grammar and uses `->` to wire events to code.
+       *
+       * Syntax: `<event>[<filter>] <modifiers> [, ...] -> <js> [; <event> -> <js> ...]`
+       *
+       * Modifiers include `once`, `changed`, `delay:`, `throttle:`, `from:`, `target:`,
+       * `prevent`, `stop`, `halt`, `capture`, `passive`, `from:self`, `from:outside`.
+       *
+       * @example
+       * ```tsx
+       * <dialog hx-on="load -> this.showModal()" />
+       * <input hx-on="keydown[key=='Escape'] -> this.blur()" />
+       * <dialog hx-on="click from:self, closeDialog from:body -> this.close()" />
+       * ```
+       *
+       * @see https://htmx.org/attributes/hx-on/
+       */
+      ["hx-on"]?: AnyStr;
       /**
        * Handle htmx lifecycle events inline with shorthand syntax.
        *
@@ -1314,6 +1370,141 @@ declare module "jsx-htmx/jsx-runtime" {
   }
 }
 
+type HtmxElementRef = string | Element | null | undefined;
+type HtmxEventTargetRef = string | EventTarget;
+type HtmxEventListener = EventListenerOrEventListenerObject;
+
+interface HtmxAjaxContext {
+  source?: HtmxElementRef;
+  event?: Event;
+  handler?: (elt: Element, info: HtmxResponseInfo) => void;
+  target?: HtmxElementRef;
+  swap?: string;
+  values?: Record<string, unknown>;
+  headers?: Record<string, string>;
+  select?: string;
+  selectOOB?: string;
+  push?: string | boolean;
+  replace?: string | boolean;
+  [key: string]: unknown;
+}
+
+/**
+ * Typed view of `htmx.config`. Mirrors the htmx 4 config surface; unknown keys
+ * remain accessible via the index signature.
+ * @see https://htmx.org/reference/#config
+ */
+interface HtmxConfig {
+  logAll: boolean;
+  /** Attribute prefix scanned for htmx attributes. Defaults to `"data-hx-"` so both `hx-*` and `data-hx-*` work. */
+  prefix: string;
+  transitions: boolean;
+  history: boolean | "reload";
+  mode: "same-origin" | "cors" | "no-cors";
+  defaultSwap: string;
+  defaultFocusScroll: boolean;
+  defaultSettleDelay: number;
+  indicatorClass: string;
+  requestClass: string;
+  includeIndicatorCSS: boolean;
+  /** Request timeout in ms. Defaults to `60000` in htmx 4 (was `0` in htmx 2). */
+  defaultTimeout: number;
+  inlineScriptNonce: string;
+  inlineStyleNonce: string;
+  extensions: string;
+  morphIgnore: string[];
+  morphScanLimit: number;
+  morphSkip?: string;
+  morphSkipChildren?: string;
+  /** Status codes (or `"4xx"`/`"5xx"` ranges) that are not swapped. Defaults to `[204, 304]`. */
+  noSwap: (number | string)[];
+  /** Restore htmx 2's implicit attribute inheritance. Defaults to `false` in htmx 4. */
+  implicitInheritance: boolean;
+  metaCharacter?: string;
+  [key: string]: unknown;
+}
+
+/** Context object passed to {@link HtmxApi.swap}. */
+interface HtmxSwapContext {
+  text: string;
+  sourceElement: Element;
+  swap?: string;
+  select?: string;
+  selectOOB?: string;
+  target?: Element;
+  transition?: boolean;
+  push?: string | boolean;
+  replace?: string | boolean;
+  anchor?: string;
+}
+
+/** A thin proxy over a set of elements returned by {@link HtmxLiveApi.q `q()`}. */
+interface HtmxQueryProxy extends Iterable<Element> {
+  /** Number of matched elements. */
+  readonly count: number;
+  /** Materialize the matches as a real array. */
+  arr(): Element[];
+  /** Re-run the selector grammar relative to each matched element. */
+  q(selector: string): HtmxQueryProxy;
+  [key: string]: any;
+}
+
+/**
+ * The `htmx.live` namespace, available when the
+ * {@linkcode JSX.HtmxBuiltinExtensions.live `hx-live`} extension is loaded.
+ */
+interface HtmxLiveApi {
+  q(selector: string | Element | ArrayLike<Element>): HtmxQueryProxy;
+  take(target: HtmxElementRef, className: string, source?: HtmxElementRef): void;
+  [key: string]: unknown;
+}
+
+/**
+ * The htmx 4 public JavaScript API. The surface was deliberately slimmed in v4:
+ * DOM helpers (`addClass`/`removeClass`/`closest`/`remove`/`off`/…) were dropped
+ * in favor of native methods, and `defineExtension` became `registerExtension`.
+ * @see https://htmx.org/docs/get-started/migration/
+ */
+interface HtmxApi {
+  version: string;
+  config: HtmxConfig;
+  /** Reactive scripting primitives from the `hx-live` extension (`q`, `take`, …). */
+  live?: HtmxLiveApi;
+  ajax(
+    verb: string,
+    path: string,
+    context?: HtmxElementRef | HtmxAjaxContext
+  ): Promise<void>;
+  find(selector: string): Element | null;
+  find(elt: HtmxElementRef, selector: string): Element | null;
+  findAll(selector: string): Element[];
+  findAll(elt: HtmxElementRef, selector: string): Element[];
+  /** Adds a listener and returns it, so it can be removed with `removeEventListener`. */
+  on(eventName: string, listener: HtmxEventListener): HtmxEventListener;
+  on(
+    target: HtmxEventTargetRef,
+    eventName: string,
+    listener: HtmxEventListener
+  ): HtmxEventListener;
+  onLoad(callback: (elt: Element) => void): void;
+  parseInterval(value: string): number;
+  process(elt: Element | Document | DocumentFragment): void;
+  /** Register an extension. Renamed from `defineExtension` in htmx 4. */
+  registerExtension(name: string, extension: Record<string, unknown>): void;
+  swap(context: HtmxSwapContext): Promise<void>;
+  takeClass(elt: HtmxElementRef, className: string, container?: Element): void;
+  /** Resolve after `ms` milliseconds. */
+  timeout(ms: number): Promise<void>;
+  /** Resolve on the next occurrence of `eventName`, or `null` on timeout. */
+  forEvent(
+    eventName: string,
+    timeout?: number,
+    on?: EventTarget
+  ): Promise<Event | null>;
+  trigger(elt: HtmxElementRef, eventName: string, detail?: unknown): boolean;
+  [key: string]: unknown;
+}
+
 interface HtmxRequestConfig extends RequestInit {
   action?: string;
   method?: string;
@@ -1498,6 +1689,7 @@ interface HtmxEventDetailMap {
   "htmx:before:sse:connection": HtmxSseConnectionDetail;
   "htmx:before:sse:message": HtmxSseMessageDetail;
   "htmx:before:swap": HtmxContextDetail & { tasks?: unknown[] };
+  "htmx:swap:finally": HtmxContextDetail;
   "htmx:before:viewTransition": HtmxViewTransitionDetail;
   "htmx:before:ws:connection": { connection: HtmxWsConnection };
   "htmx:before:ws:message": HtmxWsMessageDetail;
@@ -1505,6 +1697,7 @@ interface HtmxEventDetailMap {
   "htmx:config:request": HtmxContextDetail;
   "htmx:confirm": HtmxConfirmationDetail;
   "htmx:error": HtmxErrorDetail;
+  "htmx:response:error": HtmxContextDetail & { status?: number };
   "htmx:finally:request": HtmxContextDetail;
   "htmx:sse:close": HtmxSseCloseDetail;
   "htmx:sse:error": HtmxSseErrorDetail;
@@ -1516,8 +1709,14 @@ type HtmxCustomEventMap = {
   [K in keyof HtmxEventDetailMap]: CustomEvent<HtmxEventDetailMap[K]>;
 };
 
+declare var htmx: HtmxApi;
+
 interface DocumentEventMap extends HtmxCustomEventMap {}
 
 interface HTMLElementEventMap extends HtmxCustomEventMap {}
+
+interface Window {
+  htmx: HtmxApi;
+}
 
 interface WindowEventMap extends HtmxCustomEventMap {}
