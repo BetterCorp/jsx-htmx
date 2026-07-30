@@ -2,7 +2,7 @@
 
 Type-safe HTML and HTMX v4 templates using TypeScript.
 
-This branch tracks the `htmx.org@next` line, currently `4.0.0-beta2`.
+This branch tracks the `htmx.org@next` line, currently `4.0.0-beta6`.
 
 ## Why
 
@@ -110,7 +110,7 @@ Applications can replace `jsxConfig.sanitize` with a custom interpolation policy
 
 ## HTMX v4 Support
 
-This branch tracks **htmx v4 beta 4** semantics, including:
+This branch tracks **htmx v4 beta 6** semantics, including:
 
 - `hx-action` + `hx-method`
 - `hx-config`
@@ -122,6 +122,11 @@ This branch tracks **htmx v4 beta 4** semantics, including:
 - `hx-trigger` modifiers minus the removed `queue:*` (use `hx-sync`), plus `intersect` `root`/`rootMargin`/`threshold`
 - `hx-history-elt` (restored from htmx 2)
 - the reactive `hx-live` extension attribute and the `htmx.live` API
+- reactive `hx-live:*` bindings and the expanded `q()` API (`attr`, `take`, `toggle`, `insert`, and `data`)
+- the `hx-prompt` extension and `htmx:prompt` event
+- the `hx-multipart` streaming extension attributes and lifecycle events
+- the `swapEmpty` modifier and `htmx.config.defaultSwapEmpty`
+- the beta6 `htmx:finally:swap` event name
 - the `hx-csp` extension (renamed from `hx-nonce`) and its `hx-nonce` attribute
 - typed v4 DOM events like `htmx:config:request`, `htmx:before:request`, `htmx:response:error`, `htmx:error`
 - SSE attributes `hx-sse:connect` and `hx-sse:close`
@@ -209,6 +214,36 @@ export function ConfiguredRequest() {
     </button>
   );
 }
+```
+
+### Prompt and multipart extensions
+
+`hx-prompt` is provided by the opt-in prompt extension. It sends the answer as the `HX-Prompt` request header and cancels the request when the user cancels:
+
+```tsx
+<button hx-delete="/items/1" hx-prompt="Reason for deletion?">
+  Delete
+</button>
+```
+
+The multipart extension can process streamed `multipart/mixed` and `multipart/parallel` responses. Persistent connections use colon attributes through JSX spread syntax:
+
+```tsx
+<div
+  {...{
+    "hx-multipart:connect": "/events",
+    "hx-multipart:close": "done",
+  }}
+  hx-target="#status"
+/>
+```
+
+Use `swapEmpty:true` or `swapEmpty:false` in `hx-swap` to override whether an empty response performs the main swap:
+
+```tsx
+<button hx-post="/clear" hx-swap="innerHTML swapEmpty:true">
+  Clear
+</button>
 ```
 
 ### Inline `css`
@@ -391,7 +426,9 @@ Notable htmx v4 changes outside this package:
 - requests use `fetch()` rather than `XMLHttpRequest`
 - inheritance is explicit by default
 - error responses swap by default unless disabled (only `204`/`304` skip the swap)
-- `hx-ext`, `hx-request`, `hx-history`, `hx-params`, `hx-prompt`, and `hx-vars` are removed (`hx-history-elt` was restored in beta 3)
+- `hx-ext`, `hx-request`, `hx-params`, and `hx-vars` are removed
+- `hx-history-elt` is restored in core; `hx-history` belongs to the history-cache extension
+- `hx-prompt` is restored by the opt-in prompt extension
 - `hx-ignore` replaces the old "disable htmx processing" meaning of `hx-disable`
 - the `hx-trigger` `queue:*` modifier is gone — use `hx-sync`
 - `hx-on:event` dot-modifiers (`.prevent`, `.stop`, …) are gone — use the `hx-on="event mods -> code"` extended form

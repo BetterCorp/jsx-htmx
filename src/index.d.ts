@@ -770,6 +770,7 @@ declare module "jsx-htmx/jsx-runtime" {
       | "morph"
       | "morph:outerHTML"
       | "morph:innerHTML";
+    type HxSwapValue = HxSwap | `${HxSwap} ${string}` | AnyStr;
 
     type HxTarget =
       | "this"
@@ -836,8 +837,12 @@ declare module "jsx-htmx/jsx-runtime" {
       historyCache: "hx-history-cache";
       /** Reactive `hx-live` expressions and the `q()` selector helper. New in beta3. */
       live: "hx-live";
+      /** Stream multipart responses. New in beta6. */
+      multipart: "hx-multipart";
       optimistic: "hx-optimistic";
       preload: "hx-preload";
+      /** Restores the htmx 2 `hx-prompt` attribute. New in beta5. */
+      prompt: "hx-prompt";
       ptag: "hx-ptag";
       sse: "hx-sse";
       targets: "hx-targets";
@@ -855,6 +860,7 @@ declare module "jsx-htmx/jsx-runtime" {
       key?: {};
       ["hx-action"]?: string;
       ["hx-boost"]?: BoolStr;
+      ["hx-browser-indicator"]?: boolean | BoolStr;
       ["hx-config"]?: HxConfig;
       ["data-hx-config"]?: HxConfig;
       ["hx-confirm"]?: string;
@@ -868,10 +874,13 @@ declare module "jsx-htmx/jsx-runtime" {
       ["hx-include"]?: string;
       ["hx-indicator"]?: string;
       ["hx-method"]?: HxRequestMethod | AnyStr;
+      ["hx-multipart:connect"]?: string;
+      ["hx-multipart:close"]?: string;
       ["hx-optimistic"]?: string;
       ["hx-patch"]?: string;
       ["hx-post"]?: string;
       ["hx-preload"]?: HxPreload;
+      ["hx-prompt"]?: string;
       ["hx-preserve"]?: boolean | "true";
       ["hx-push-url"]?: BoolStr | AnyStr;
       ["hx-put"]?: string;
@@ -896,12 +905,12 @@ declare module "jsx-htmx/jsx-runtime" {
        * - `morph` swaps are part of the {@linkcode HtmxBuiltinExtensions.idiomorph idiomorph} extension.
        * - `morphdom` swaps are part of the {@linkcode HtmxBuiltinExtensions.morphdom morphdom} extension.
        */
-      ["hx-swap"]?: HxSwap | AnyStr;
+      ["hx-swap"]?: HxSwapValue;
       /**
        * Marks content in a response to be out of band (should swap in somewhere other than the target).
        * @see https://htmx.org/attributes/hx-swap-oob/
        */
-      ["hx-swap-oob"]?: "true" | HxSwap | AnyStr;
+      ["hx-swap-oob"]?: "true" | HxSwapValue;
       /**
        * Specifies the target element to be swapped.
        * @see https://htmx.org/attributes/hx-target/
@@ -925,7 +934,7 @@ declare module "jsx-htmx/jsx-runtime" {
        * - `from:<selector>` — listen on a different element
        * - `target:<selector>` — filter by event target
        * - `consume` — call `stopPropagation()`
-       * - `queue:<first|last|all|none>` — queue strategy
+       * Queueing is configured with `hx-sync`; htmx 4 removed `queue:*` here.
        *
        * **Polling:** `every <time>` for periodic requests (e.g. `every 2s`).
        *
@@ -986,6 +995,8 @@ declare module "jsx-htmx/jsx-runtime" {
        * @category Core
        */
       ["hx-history-elt"]?: boolean | "true";
+      /** Opt out of the history-cache extension for this element or page. */
+      ["hx-history"]?: false | "false";
       /**
        * A JavaScript expression that re-runs whenever the DOM changes (input/change
        * events or mutations). Provided by the {@linkcode HtmxBuiltinExtensions.live `hx-live`} extension.
@@ -995,6 +1006,8 @@ declare module "jsx-htmx/jsx-runtime" {
        * @see https://htmx.org/extensions/hx-live/
        */
       ["hx-live"]?: AnyStr;
+      /** Reactive attribute/property/class/style/text binding provided by hx-live. */
+      [key: `hx-live:${string}`]: AnyStr | undefined;
       /**
        * CSP nonce stamped by the server on every htmx-bearing element. The
        * {@linkcode HtmxBuiltinExtensions.csp `hx-csp`} extension strips htmx
@@ -1102,6 +1115,8 @@ declare module "jsx-htmx/jsx-runtime" {
        * @see https://htmx.org/attributes/hx-confirm/
        */
       ["hx-confirm:inherited"]?: HtmxModifierValue;
+      /** Inherit the hx-prompt extension question to child requests. */
+      ["hx-prompt:inherited"]?: HtmxModifierValue;
       /**
        * Inherit `hx-delete` to child elements.
        * Children can trigger this DELETE endpoint without their own `hx-delete`.
@@ -1410,24 +1425,29 @@ interface HtmxConfig {
   includeIndicatorCSS: boolean;
   /** Request timeout in ms. Defaults to `60000` in htmx 4 (was `0` in htmx 2). */
   defaultTimeout: number;
-  inlineScriptNonce: string;
+  inlineScriptNonce?: string;
   extensions: string;
   morphIgnore: string[];
   morphScanLimit: number;
   morphSkip?: string;
   morphSkipChildren?: string;
+  /** Whether an empty response performs the main swap. */
+  defaultSwapEmpty?: boolean;
   /** Status codes (or `"4xx"`/`"5xx"` ranges) that are not swapped. Defaults to `[204, 304]`. */
   noSwap: (number | string)[];
   /** Restore htmx 2's implicit attribute inheritance. Defaults to `false` in htmx 4. */
   implicitInheritance: boolean;
   metaCharacter?: string;
+  live?: { inputDebounceMs?: number };
+  multipart?: HtmxMultipartConfig;
+  ws?: HtmxWsConfig;
   [key: string]: unknown;
 }
 
 /** Context object passed to {@link HtmxApi.swap}. */
 interface HtmxSwapContext {
   text: string;
-  sourceElement: Element;
+  sourceElement?: Element;
   swap?: string;
   select?: string;
   selectOOB?: string;
@@ -1446,6 +1466,13 @@ interface HtmxQueryProxy extends Iterable<Element> {
   arr(): Element[];
   /** Re-run the selector grammar relative to each matched element. */
   q(selector: string): HtmxQueryProxy;
+  attr(name: string): any;
+  attr(name: string, value: any): HtmxQueryProxy;
+  take(name: string, scope?: string | Node | { from: string }): HtmxQueryProxy;
+  toggle(name: string, values?: string | string[]): HtmxQueryProxy;
+  trigger(type: string, detail?: any, bubbles?: boolean): HtmxQueryProxy;
+  insert(position: "before" | "after" | "start" | "end", html: string): HtmxQueryProxy;
+  data?: Record<string, any>;
   [key: string]: any;
 }
 
@@ -1454,18 +1481,25 @@ interface HtmxQueryProxy extends Iterable<Element> {
  * {@linkcode JSX.HtmxBuiltinExtensions.live `hx-live`} extension is loaded.
  */
 interface HtmxLiveApi {
-  q(selector: string | Element | ArrayLike<Element>): HtmxQueryProxy;
-  take(target: HtmxElementRef, className: string, source?: HtmxElementRef): void;
-  /** Resolve on the next occurrence of `eventName`, or `null` on timeout. */
-  forEvent(
-    eventName: string,
-    timeout?: number,
-    on?: EventTarget
-  ): Promise<Event | null>;
-  /** Per-channel debounce; closure form is keyed by `fn.toString()`. */
-  debounce(ms: number, fn?: () => unknown): Promise<void> | void;
+  q(selector: string | Element | Iterable<Element> | ArrayLike<Element>): HtmxQueryProxy;
+  take(
+    target: string | Element | NodeList,
+    name: string,
+    scope?: string | Node | { from: string }
+  ): void;
+  toggle(
+    target: string | Element | NodeList,
+    name: string,
+    values?: string | string[]
+  ): void;
+  attr(target: string | Element | NodeList, name: string): any;
+  attr(target: string | Element | NodeList, name: string, value: any): void;
+  forEvent(...args: (string | number | EventTarget)[]): Promise<Event | null>;
+  debounce(ms: number): Promise<void>;
+  debounce(ms: number, fn: () => void): void;
   /** Force a recompute of all live expressions. */
   refresh(): void;
+  nextFrame(): Promise<void>;
   [key: string]: unknown;
 }
 
@@ -1490,6 +1524,15 @@ interface HtmxApi {
   findAll(selector: string): Element[];
   findAll(elt: HtmxElementRef, selector: string): Element[];
   /** Adds a listener and returns it, so it can be removed with `removeEventListener`. */
+  on<K extends keyof HtmxEventDetailMap>(
+    eventName: K,
+    listener: (event: CustomEvent<HtmxEventDetailMap[K]>) => void
+  ): (event: CustomEvent<HtmxEventDetailMap[K]>) => void;
+  on<K extends keyof HtmxEventDetailMap>(
+    target: HtmxEventTargetRef,
+    eventName: K,
+    listener: (event: CustomEvent<HtmxEventDetailMap[K]>) => void
+  ): (event: CustomEvent<HtmxEventDetailMap[K]>) => void;
   on(eventName: string, listener: HtmxEventListener): HtmxEventListener;
   on(
     target: HtmxEventTargetRef,
@@ -1497,14 +1540,25 @@ interface HtmxApi {
     listener: HtmxEventListener
   ): HtmxEventListener;
   onLoad(callback: (elt: Element) => void): void;
-  parseInterval(value: string): number;
-  process(elt: Element | Document | DocumentFragment): void;
+  parseInterval(value: string | number): number | undefined;
+  process(elt: Element | Document | DocumentFragment, force?: boolean): void;
   /** Register an extension. Renamed from `defineExtension` in htmx 4. */
   registerExtension(name: string, extension: Record<string, unknown>): void;
   swap(context: HtmxSwapContext): Promise<void>;
   /** Resolve after `ms` milliseconds. */
-  timeout(ms: number): Promise<void>;
-  trigger(elt: HtmxElementRef, eventName: string, detail?: unknown): boolean;
+  timeout(value: number | string): Promise<void> | undefined;
+  trigger<K extends keyof HtmxEventDetailMap>(
+    elt: HtmxElementRef,
+    eventName: K,
+    detail: HtmxEventDetailMap[K],
+    bubbles?: boolean
+  ): boolean;
+  trigger(
+    elt: HtmxElementRef,
+    eventName: string,
+    detail?: unknown,
+    bubbles?: boolean
+  ): boolean;
   [key: string]: unknown;
 }
 
@@ -1515,7 +1569,8 @@ interface HtmxRequestConfig extends RequestInit {
   body?: BodyInit | null;
   validate?: boolean;
   sse?: Record<string, unknown>;
-  ws?: Record<string, unknown>;
+  multipart?: HtmxMultipartConfig;
+  ws?: HtmxWsConfig;
   [key: string]: unknown;
 }
 
@@ -1572,6 +1627,10 @@ interface HtmxHistoryDetail {
 
 interface HtmxPathDetail {
   path: string;
+}
+
+interface HtmxHistoryRestoreDetail extends HtmxPathDetail {
+  cacheMiss?: boolean;
 }
 
 interface HtmxImplicitInheritanceDetail extends HtmxElementDetail {
@@ -1631,10 +1690,84 @@ interface HtmxSseCloseDetail {
 
 interface HtmxWsConnection {
   url?: string;
+  config?: HtmxWsConfig;
   socket?: WebSocket | null;
   attempt?: number;
   cancelled?: boolean;
   [key: string]: unknown;
+}
+
+interface HtmxWsConfig {
+  protocols?: string | string[];
+  reconnect?: boolean;
+  reconnectDelay?: number | string;
+  reconnectMaxDelay?: number | string;
+  reconnectMaxAttempts?: number;
+  reconnectJitter?: number;
+  pauseOnBackground?: boolean;
+  pendingRequestTTL?: number;
+  [key: string]: unknown;
+}
+
+interface HtmxDownloadProgressDetail {
+  loaded: number;
+  total: number | null;
+  percent: number | null;
+}
+
+interface HtmxHeadElementDetail {
+  headElement: Element;
+}
+
+interface HtmxHistoryCacheItem {
+  content?: string;
+  head?: string;
+  scroll?: number;
+  title?: string;
+  [key: string]: unknown;
+}
+
+interface HtmxMultipartConfig {
+  reconnect?: boolean;
+  reconnectDelay?: number | string;
+  reconnectMaxDelay?: number | string;
+  reconnectMaxAttempts?: number;
+  reconnectJitter?: number;
+  pauseOnBackground?: boolean;
+  [key: string]: unknown;
+}
+
+interface HtmxMultipartConnection {
+  url?: string;
+  config?: HtmxMultipartConfig;
+  attempt?: number;
+  status?: number;
+  cancelled?: boolean;
+  [key: string]: unknown;
+}
+
+interface HtmxMultipartPart {
+  readonly headers: Headers;
+  readonly body: ReadableStream<Uint8Array> | null;
+  readonly bodyUsed: boolean;
+  arrayBuffer(): Promise<ArrayBuffer>;
+  blob(): Promise<Blob>;
+  bytes(): Promise<Uint8Array>;
+  json(): Promise<unknown>;
+  text(): Promise<string>;
+}
+
+interface HtmxMultipartConnectionDetail {
+  connection: HtmxMultipartConnection;
+}
+
+interface HtmxMultipartPartDetail extends HtmxContextDetail {
+  part: HtmxMultipartPart;
+}
+
+interface HtmxMultipartBeforePartDetail extends HtmxMultipartPartDetail {
+  cancelled: boolean;
+  waitUntil(promise: PromiseLike<unknown>): void;
 }
 
 interface HtmxWsRequestDetail {
@@ -1669,6 +1802,11 @@ interface HtmxEventDetailMap {
   "htmx:after:history:push": HtmxPathDetail;
   "htmx:after:history:replace": HtmxPathDetail;
   "htmx:after:history:update": HtmxHistoryDetail;
+  "htmx:after:head:merge": {
+    added: Element[];
+    kept: Element[];
+    removed: Element[];
+  };
   "htmx:after:implicitInheritance": HtmxImplicitInheritanceDetail;
   "htmx:after:init": HtmxElementDetail;
   "htmx:after:process": HtmxElementDetail;
@@ -1681,10 +1819,44 @@ interface HtmxEventDetailMap {
   "htmx:after:ws:connection": { connection: HtmxWsConnection };
   "htmx:after:ws:message": HtmxWsMessageDetail;
   "htmx:after:ws:request": HtmxWsRequestDetail;
+  "htmx:download:complete": { filename: string; size: number };
+  "htmx:download:progress": HtmxDownloadProgressDetail;
+  "htmx:download:start": { total: number | null };
+  "htmx:history:cache:after:restore": { item: HtmxHistoryCacheItem };
+  "htmx:history:cache:after:save": HtmxHistoryCacheItem;
+  "htmx:history:cache:before:restore": {
+    head?: string;
+    ready?: PromiseLike<unknown>;
+  };
+  "htmx:history:cache:before:save": {
+    target: Element;
+    head: string;
+    cancelled?: boolean;
+  };
+  "htmx:history:cache:hit": { path: string; item: HtmxHistoryCacheItem };
+  "htmx:history:cache:miss": { path: string; refreshOnMiss?: boolean };
+  "htmx:multipart:after:connection": HtmxMultipartConnectionDetail;
+  "htmx:multipart:after:part": HtmxMultipartPartDetail;
+  "htmx:multipart:before:connection": HtmxMultipartConnectionDetail;
+  "htmx:multipart:before:part": HtmxMultipartBeforePartDetail;
+  "htmx:multipart:close": HtmxMultipartConnectionDetail & { reason?: string };
+  "htmx:multipart:error": { error?: unknown; url?: string; status?: number };
+  "htmx:prompt": { prompt: string; target: Element };
+  "htmx:security:strip": { reason: string; stripped: string[] };
+  "htmx:security:violation": {
+    reason: string;
+    action?: string;
+    ctx?: HtmxRequestContext;
+    submitter?: HTMLElement;
+  };
+  "htmx:before:head:add": HtmxHeadElementDetail;
+  "htmx:before:head:merge": HtmxContextDetail;
+  "htmx:before:head:remove": HtmxHeadElementDetail;
   "htmx:before:cleanup": HtmxElementDetail;
-  "htmx:before:history:restore": HtmxPathDetail;
+  "htmx:before:history:restore": HtmxHistoryRestoreDetail;
   "htmx:before:history:update": HtmxHistoryDetail;
   "htmx:before:init": HtmxElementDetail;
+  "htmx:before:on:init": Record<string, never>;
   "htmx:before:process": HtmxElementDetail;
   "htmx:before:request": HtmxContextDetail;
   "htmx:before:response": HtmxContextDetail;
@@ -1692,7 +1864,7 @@ interface HtmxEventDetailMap {
   "htmx:before:sse:connection": HtmxSseConnectionDetail;
   "htmx:before:sse:message": HtmxSseMessageDetail;
   "htmx:before:swap": HtmxContextDetail & { tasks?: unknown[] };
-  "htmx:swap:finally": HtmxContextDetail;
+  "htmx:finally:swap": HtmxContextDetail;
   "htmx:before:viewTransition": HtmxViewTransitionDetail;
   "htmx:before:ws:connection": { connection: HtmxWsConnection };
   "htmx:before:ws:message": HtmxWsMessageDetail;
@@ -1702,24 +1874,43 @@ interface HtmxEventDetailMap {
   "htmx:error": HtmxErrorDetail;
   "htmx:response:error": HtmxContextDetail & { status?: number };
   "htmx:finally:request": HtmxContextDetail;
+  "htmx:process:partial": HtmxContextDetail & { tasks: unknown[] };
   "htmx:sse:close": HtmxSseCloseDetail;
   "htmx:sse:error": HtmxSseErrorDetail;
   "htmx:ws:close": HtmxWsCloseDetail;
   "htmx:ws:error": HtmxWsErrorDetail;
 }
 
-type HtmxCustomEventMap = {
-  [K in keyof HtmxEventDetailMap]: CustomEvent<HtmxEventDetailMap[K]>;
-};
-
 declare var htmx: HtmxApi;
 
-interface DocumentEventMap extends HtmxCustomEventMap {}
+interface Document {
+  addEventListener<K extends keyof HtmxEventDetailMap>(
+    type: K,
+    listener: (this: Document, event: CustomEvent<HtmxEventDetailMap[K]>) => any,
+    options?: boolean | AddEventListenerOptions
+  ): void;
+}
 
-interface HTMLElementEventMap extends HtmxCustomEventMap {}
+interface HTMLElement {
+  addEventListener<K extends keyof HtmxEventDetailMap>(
+    type: K,
+    listener: (this: HTMLElement, event: CustomEvent<HtmxEventDetailMap[K]>) => any,
+    options?: boolean | AddEventListenerOptions
+  ): void;
+}
 
 interface Window {
   htmx: HtmxApi;
+  /** Override the synchronous dialog used by the hx-prompt extension. */
+  htmxPrompt?: (question: string) => string | null;
+  addEventListener<K extends keyof HtmxEventDetailMap>(
+    type: K,
+    listener: (this: Window, event: CustomEvent<HtmxEventDetailMap[K]>) => any,
+    options?: boolean | AddEventListenerOptions
+  ): void;
 }
 
-interface WindowEventMap extends HtmxCustomEventMap {}
+interface Response {
+  /** Iterate multipart response bodies when the hx-multipart extension is loaded. */
+  parts(): AsyncIterableIterator<HtmxMultipartPart>;
+}
