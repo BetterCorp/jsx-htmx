@@ -92,6 +92,7 @@ declare module "jsx-htmx" {
   const html: HtmlTemplator;
   function css(input: string | CssRules): RawText;
   function js(input: string | (() => unknown)): RawText;
+  function raw(input: string): RawText;
 
   type Element = string;
 }

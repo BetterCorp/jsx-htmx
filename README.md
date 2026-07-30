@@ -68,11 +68,45 @@ The runtime exports:
 - **`html`** — a tagged template that interpolates values into escaped HTML. Object values for `hx-config`/`hx-vals`/`hx-headers` are serialized to JSON. Pass a `RawText` (e.g. from `css`/`js`) to opt out of escaping.
 - **`css`** — author CSS as a string (passthrough) or as a typed object of rules, returned as `RawText` for embedding in a `<style>` tag. See [Inline `css`](#inline-css).
 - **`js`** — embed client JavaScript as a string, or as a function whose **body is extracted** so your editor type-checks it, returned as `RawText` for a `<script>` tag. See [Inline `js`](#inline-js).
-- **`jsxConfig`** — runtime config: `jsonAttributes` (attribute names serialized to JSON), `trusted` (skip sanitization), and `sanitize` (a custom sanitizer).
+- **`raw`** — mark a trusted HTML string for verbatim insertion. See [Escaping and trusted HTML](#escaping-and-trusted-html).
+- **`jsxConfig`** — runtime config: `jsonAttributes` (attribute names serialized to JSON), `trusted` (skip sanitization), and `sanitize` (the interpolation policy).
 
-Everything returned by `css` and `js` is a `RawText` instance, so it is emitted verbatim and never double-escaped when placed inside JSX children.
+Everything returned by `raw`, `css`, and `js` is a `RawText` instance, so it is emitted verbatim and never double-escaped when placed inside JSX children.
 
 `hx-config`, `hx-vals`, and `hx-headers` support object literals and are serialized to JSON automatically. Their `data-hx-*` forms are supported too.
+
+### Escaping and trusted HTML
+
+Interpolated values are HTML-escaped by default. Build reusable output with JSX and interpolate it directly: the JSX tags remain markup while their data stays escaped.
+
+```tsx
+const output = (
+  <ul>
+    <li>{data1}</li>
+    <li>{data2}</li>
+  </ul>
+);
+
+return <div>{output}</div>;
+```
+
+Use `raw` only when a complete HTML string is already trusted or has been independently sanitized:
+
+```tsx
+import { raw } from "jsx-htmx";
+
+return <div>{raw("<strong>Trusted HTML</strong>")}</div>;
+```
+
+`raw` trusts the entire string. It cannot distinguish intended tags from interpolated data, so do not use it to make string-built views:
+
+```tsx
+// Unsafe when data contains untrusted HTML:
+const output = `<ul><li>${data}</li></ul>`;
+return <div>{raw(output)}</div>;
+```
+
+Applications can replace `jsxConfig.sanitize` with a custom interpolation policy or explicitly set it to `false`. Setting `jsxConfig.trusted` to `true` skips interpolation sanitization for the entire runtime.
 
 ## HTMX v4 Support
 

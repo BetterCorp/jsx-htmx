@@ -198,7 +198,7 @@ export const jsxConfig: JsxConfig = {
     "data-hx-vals",
     "data-hx-headers",
   ]),
-  sanitize: false,
+  sanitize: attrSanitizer,
   trusted: false,
 };
 
@@ -391,6 +391,10 @@ function extractFunctionBody(code: () => unknown): string {
 
 export function js(input: string | (() => unknown)): RawText {
   return new RawText(typeof input === "string" ? input : extractFunctionBody(input));
+}
+
+export function raw(input: string): RawText {
+  return new RawText(input);
 }
 
 export type Element = string;
