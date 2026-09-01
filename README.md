@@ -2,7 +2,7 @@
 
 Type-safe HTML and HTMX v4 templates using TypeScript.
 
-This branch tracks the `htmx.org@next` line, currently `4.0.0-beta6`.
+This package targets htmx `4.0.0`.
 
 ## Why
 
@@ -20,7 +20,7 @@ I wanted an htmx-focused JSX library that:
 - as JSX typings only
 - as a small JSX-to-HTML templating runtime
 
-This package does not bundle `htmx` itself. Install `htmx.org@next` separately when you need the browser runtime.
+This package does not bundle `htmx` itself. Install `htmx.org@4` separately when you need the browser runtime.
 
 Any htmx attribute name that contains `:` must be written through a spread object in JSX:
 
@@ -33,7 +33,7 @@ Use direct JSX props only for names that are valid JSX identifiers, such as `hx-
 ## Install
 
 ```bash
-npm install jsx-htmx htmx.org@next
+npm install jsx-htmx htmx.org@4
 ```
 
 ## Type Setup
@@ -110,7 +110,7 @@ Applications can replace `jsxConfig.sanitize` with a custom interpolation policy
 
 ## HTMX v4 Support
 
-This branch tracks **htmx v4 beta 6** semantics, including:
+This package tracks **htmx v4** semantics, including:
 
 - `hx-action` + `hx-method`
 - `hx-config`
@@ -125,8 +125,12 @@ This branch tracks **htmx v4 beta 6** semantics, including:
 - reactive `hx-live:*` bindings and the expanded `q()` API (`attr`, `take`, `toggle`, `insert`, and `data`)
 - the `hx-prompt` extension and `htmx:prompt` event
 - the `hx-multipart` streaming extension attributes and lifecycle events
-- the `swapEmpty` modifier and `htmx.config.defaultSwapEmpty`
-- the beta6 `htmx:finally:swap` event name
+- the `swapEmpty` modifier and `htmx.config.allowEmptySwapAfterOOB`
+- the `htmx:finally:swap` event name
+- the `hx-query` request attribute
+- the `hx-pending` extension
+- `htmx.initialize()` for async and streaming initialization
+- standardized `htmx:sse:*`, `htmx:ws:*`, and `htmx:head:*` extension events
 - the `hx-csp` extension (renamed from `hx-nonce`) and its `hx-nonce` attribute
 - typed v4 DOM events like `htmx:config:request`, `htmx:before:request`, `htmx:response:error`, `htmx:error`
 - SSE attributes `hx-sse:connect` and `hx-sse:close`
@@ -441,8 +445,8 @@ If you still need the v2 surface, stay on the v2 branch / release line.
 
 This package’s v4 typings were aligned against:
 
-- `htmx.org@next` package contents, especially `dist/htmx.d.ts`
+- `htmx.org@4` package contents, especially `dist/htmx.d.ts`
 - shipped extension source in `dist/ext/*`
 - official htmx v4 docs and migration guide
 
-When docs and shipped beta source disagree, this package prefers the shipped `htmx.org@next` behavior.
+When docs and shipped source disagree, this package prefers the shipped `htmx.org@4` behavior.

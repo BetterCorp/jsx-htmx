@@ -1,6 +1,6 @@
 {
   "name": "jsx-htmx",
-  "version": "4.0.0-beta6",
+  "version": "4.0.0",
   "description": "Type-safe HTML and HTMX v4 templates using TypeScript.",
   "repository": {
     "type": "git",
@@ -65,14 +65,14 @@
   "license": "AGPL-3.0-only",
   "devDependencies": {
     "@types/node": "^20.11.16",
-    "htmx.org": "^4.0.0-beta6",
+    "htmx.org": "^4.0.0",
     "typescript": "^5.3.3"
   },
   "dependencies": {
     "csstype": "^3.2.3"
   },
   "peerDependencies": {
-    "htmx.org": "^4.0.0-beta6"
+    "htmx.org": "^4.0.0"
   },
   "peerDependenciesMeta": {
     "htmx.org": {

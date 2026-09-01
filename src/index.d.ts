@@ -747,11 +747,13 @@ declare module "jsx-htmx/jsx-runtime" {
       | "put"
       | "patch"
       | "delete"
+      | "query"
       | "GET"
       | "POST"
       | "PUT"
       | "PATCH"
-      | "DELETE";
+      | "DELETE"
+      | "QUERY";
     type HxSwap =
       | "innerHTML"
       | "outerHTML"
@@ -822,7 +824,7 @@ declare module "jsx-htmx/jsx-runtime" {
     type HtmxModifierValue = string | boolean | undefined;
 
     /**
-     * Names for official htmx v4 extensions bundled in `htmx.org@next`.
+     * Names for official htmx v4 extensions bundled in `htmx.org@4`.
      * Extensions are page-wide in v4 and loaded via script imports or config allowlists.
      */
     interface HtmxBuiltinExtensions {
@@ -839,7 +841,7 @@ declare module "jsx-htmx/jsx-runtime" {
       live: "hx-live";
       /** Stream multipart responses. New in beta6. */
       multipart: "hx-multipart";
-      optimistic: "hx-optimistic";
+      pending: "hx-pending";
       preload: "hx-preload";
       /** Restores the htmx 2 `hx-prompt` attribute. New in beta5. */
       prompt: "hx-prompt";
@@ -874,16 +876,19 @@ declare module "jsx-htmx/jsx-runtime" {
       ["hx-include"]?: string;
       ["hx-indicator"]?: string;
       ["hx-method"]?: HxRequestMethod | AnyStr;
+      ["hx-morph-skip"]?: boolean | "true";
+      ["hx-morph-skip-children"]?: boolean | "true";
       ["hx-multipart:connect"]?: string;
       ["hx-multipart:close"]?: string;
-      ["hx-optimistic"]?: string;
       ["hx-patch"]?: string;
+      ["hx-pending"]?: string;
       ["hx-post"]?: string;
       ["hx-preload"]?: HxPreload;
       ["hx-prompt"]?: string;
       ["hx-preserve"]?: boolean | "true";
       ["hx-push-url"]?: BoolStr | AnyStr;
       ["hx-put"]?: string;
+      ["hx-query"]?: string;
       /**
        * Select content to swap in from a response.
        * @see https://htmx.org/attributes/hx-select/
@@ -1431,14 +1436,19 @@ interface HtmxConfig {
   morphScanLimit: number;
   morphSkip?: string;
   morphSkipChildren?: string;
-  /** Whether an empty response performs the main swap. */
-  defaultSwapEmpty?: boolean;
+  /** Run the main swap when a response contains only out-of-band elements. */
+  allowEmptySwapAfterOOB: boolean;
   /** Status codes (or `"4xx"`/`"5xx"` ranges) that are not swapped. Defaults to `[204, 304]`. */
   noSwap: (number | string)[];
   /** Restore htmx 2's implicit attribute inheritance. Defaults to `false` in htmx 4. */
   implicitInheritance: boolean;
   metaCharacter?: string;
-  live?: { inputDebounceMs?: number };
+  live?: {
+    inputDebounce?: number | string;
+    bindPrefix?: string | false;
+    useDollar?: boolean;
+  };
+  sse?: HtmxSseConfig;
   multipart?: HtmxMultipartConfig;
   ws?: HtmxWsConfig;
   [key: string]: unknown;
@@ -1466,14 +1476,32 @@ interface HtmxQueryProxy extends Iterable<Element> {
   arr(): Element[];
   /** Re-run the selector grammar relative to each matched element. */
   q(selector: string): HtmxQueryProxy;
-  attr(name: string): any;
-  attr(name: string, value: any): HtmxQueryProxy;
+  readonly attr: Record<string, any> & { readonly class: HtmxClassProxy };
+  readonly data: Record<string, any>;
+  readonly aria: Record<string, any>;
+  readonly class: HtmxClassProxy;
+  readonly local: HtmxQueryScope;
+  readonly closest: HtmxQueryScope & ((selector: string) => HtmxQueryProxy);
   take(name: string, scope?: string | Node | { from: string }): HtmxQueryProxy;
-  toggle(name: string, values?: string | string[]): HtmxQueryProxy;
+  toggle(name: string, ...values: any[]): HtmxQueryProxy;
   trigger(type: string, detail?: any, bubbles?: boolean): HtmxQueryProxy;
-  insert(position: "before" | "after" | "start" | "end", html: string): HtmxQueryProxy;
-  data?: Record<string, any>;
+  insert(
+    position: "before" | "after" | "start" | "end" | "into" | "replace",
+    html: string
+  ): HtmxQueryProxy;
   [key: string]: any;
+}
+
+interface HtmxClassProxy extends DOMTokenList {
+  assign(classes: Record<string, any>): void;
+  [name: string]: any;
+}
+
+interface HtmxQueryScope {
+  readonly attr: Record<string, any> & { readonly class: HtmxClassProxy };
+  readonly data: Record<string, any>;
+  readonly aria: Record<string, any>;
+  readonly class: HtmxClassProxy;
 }
 
 /**
@@ -1482,6 +1510,7 @@ interface HtmxQueryProxy extends Iterable<Element> {
  */
 interface HtmxLiveApi {
   q(selector: string | Element | Iterable<Element> | ArrayLike<Element>): HtmxQueryProxy;
+  $(selector: string | Element | Iterable<Element> | ArrayLike<Element>): HtmxQueryProxy;
   take(
     target: string | Element | NodeList,
     name: string,
@@ -1490,11 +1519,9 @@ interface HtmxLiveApi {
   toggle(
     target: string | Element | NodeList,
     name: string,
-    values?: string | string[]
+    ...values: any[]
   ): void;
-  attr(target: string | Element | NodeList, name: string): any;
-  attr(target: string | Element | NodeList, name: string, value: any): void;
-  forEvent(...args: (string | number | EventTarget)[]): Promise<Event | null>;
+  forEvent(...args: (string | number | EventTarget)[]): Promise<Event | string | number>;
   debounce(ms: number): Promise<void>;
   debounce(ms: number, fn: () => void): void;
   /** Force a recompute of all live expressions. */
@@ -1540,6 +1567,8 @@ interface HtmxApi {
     listener: HtmxEventListener
   ): HtmxEventListener;
   onLoad(callback: (elt: Element) => void): void;
+  /** Set up history handling and process `document.body`. Safe to call repeatedly. */
+  initialize(): void;
   parseInterval(value: string | number): number | undefined;
   process(elt: Element | Document | DocumentFragment, force?: boolean): void;
   /** Register an extension. Renamed from `defineExtension` in htmx 4. */
@@ -1568,7 +1597,7 @@ interface HtmxRequestConfig extends RequestInit {
   headers?: Record<string, string>;
   body?: BodyInit | null;
   validate?: boolean;
-  sse?: Record<string, unknown>;
+  sse?: HtmxSseConfig;
   multipart?: HtmxMultipartConfig;
   ws?: HtmxWsConfig;
   [key: string]: unknown;
@@ -1661,6 +1690,17 @@ interface HtmxSseConnection {
   [key: string]: unknown;
 }
 
+interface HtmxSseConfig {
+  reconnect?: boolean;
+  reconnectDelay?: number | string;
+  reconnectMaxDelay?: number | string;
+  reconnectMaxAttempts?: number;
+  reconnectJitter?: number;
+  pauseOnBackground?: boolean;
+  releaseOn?: "immediate" | "first" | "end";
+  [key: string]: unknown;
+}
+
 interface HtmxSseMessage {
   data?: string;
   event?: string;
@@ -1674,10 +1714,17 @@ interface HtmxSseConnectionDetail {
 }
 
 interface HtmxSseMessageDetail {
+  connection: HtmxSseConnection;
   message: HtmxSseMessage;
 }
 
+interface HtmxSseBeforeMessageDetail extends HtmxSseMessageDetail {
+  cancelled: boolean;
+  waitUntil(promise: PromiseLike<unknown>): void;
+}
+
 interface HtmxSseErrorDetail {
+  connection?: HtmxSseConnection;
   error?: unknown;
   url?: string;
   status?: number;
@@ -1705,7 +1752,8 @@ interface HtmxWsConfig {
   reconnectMaxAttempts?: number;
   reconnectJitter?: number;
   pauseOnBackground?: boolean;
-  pendingRequestTTL?: number;
+  reconnectCodes?: number[];
+  maxOutgoingMessagesQueueSize?: number;
   [key: string]: unknown;
 }
 
@@ -1742,6 +1790,7 @@ interface HtmxMultipartConnection {
   config?: HtmxMultipartConfig;
   attempt?: number;
   status?: number;
+  lastPartId?: string;
   cancelled?: boolean;
   [key: string]: unknown;
 }
@@ -1762,6 +1811,7 @@ interface HtmxMultipartConnectionDetail {
 }
 
 interface HtmxMultipartPartDetail extends HtmxContextDetail {
+  connection: HtmxMultipartConnection;
   part: HtmxMultipartPart;
 }
 
@@ -1770,18 +1820,27 @@ interface HtmxMultipartBeforePartDetail extends HtmxMultipartPartDetail {
   waitUntil(promise: PromiseLike<unknown>): void;
 }
 
-interface HtmxWsRequestDetail {
+interface HtmxWsOutgoingMessage {
   headers?: Record<string, string>;
-  body?: Record<string, unknown>;
+  values?: Record<string, unknown>;
+  data?: string | ArrayBufferLike | Blob | ArrayBufferView;
   [key: string]: unknown;
 }
 
-interface HtmxWsMessageDetail {
-  message: {
-    text?: string;
-    json?: unknown;
-    cancelled?: boolean;
-  };
+interface HtmxWsIncomingMessage {
+  data: string | ArrayBuffer | Blob;
+  text(): Promise<string>;
+  json(): Promise<unknown>;
+}
+
+interface HtmxWsMessageDetail<Message> {
+  connection: HtmxWsConnection;
+  message: Message;
+}
+
+interface HtmxWsBeforeMessageDetail<Message> extends HtmxWsMessageDetail<Message> {
+  cancelled: boolean;
+  waitUntil(promise: PromiseLike<unknown>): void;
 }
 
 interface HtmxWsCloseDetail {
@@ -1792,6 +1851,7 @@ interface HtmxWsCloseDetail {
 }
 
 interface HtmxWsErrorDetail {
+  connection?: HtmxWsConnection;
   url?: string | null;
   error?: unknown;
 }
@@ -1802,7 +1862,7 @@ interface HtmxEventDetailMap {
   "htmx:after:history:push": HtmxPathDetail;
   "htmx:after:history:replace": HtmxPathDetail;
   "htmx:after:history:update": HtmxHistoryDetail;
-  "htmx:after:head:merge": {
+  "htmx:head:after:merge": {
     added: Element[];
     kept: Element[];
     removed: Element[];
@@ -1812,13 +1872,8 @@ interface HtmxEventDetailMap {
   "htmx:after:process": HtmxElementDetail;
   "htmx:after:request": HtmxContextDetail;
   "htmx:after:settle": HtmxSettleDetail;
-  "htmx:after:sse:connection": HtmxSseConnectionDetail;
-  "htmx:after:sse:message": HtmxSseMessageDetail;
   "htmx:after:swap": HtmxContextDetail;
   "htmx:after:viewTransition": HtmxViewTransitionDetail;
-  "htmx:after:ws:connection": { connection: HtmxWsConnection };
-  "htmx:after:ws:message": HtmxWsMessageDetail;
-  "htmx:after:ws:request": HtmxWsRequestDetail;
   "htmx:download:complete": { filename: string; size: number };
   "htmx:download:progress": HtmxDownloadProgressDetail;
   "htmx:download:start": { total: number | null };
@@ -1840,7 +1895,12 @@ interface HtmxEventDetailMap {
   "htmx:multipart:before:connection": HtmxMultipartConnectionDetail;
   "htmx:multipart:before:part": HtmxMultipartBeforePartDetail;
   "htmx:multipart:close": HtmxMultipartConnectionDetail & { reason?: string };
-  "htmx:multipart:error": { error?: unknown; url?: string; status?: number };
+  "htmx:multipart:error": {
+    connection?: HtmxMultipartConnection;
+    error?: unknown;
+    url?: string;
+    status?: number;
+  };
   "htmx:prompt": { prompt: string; target: Element };
   "htmx:security:strip": { reason: string; stripped: string[] };
   "htmx:security:violation": {
@@ -1849,9 +1909,9 @@ interface HtmxEventDetailMap {
     ctx?: HtmxRequestContext;
     submitter?: HTMLElement;
   };
-  "htmx:before:head:add": HtmxHeadElementDetail;
-  "htmx:before:head:merge": HtmxContextDetail;
-  "htmx:before:head:remove": HtmxHeadElementDetail;
+  "htmx:head:before:add": HtmxHeadElementDetail;
+  "htmx:head:before:merge": HtmxContextDetail;
+  "htmx:head:before:remove": HtmxHeadElementDetail;
   "htmx:before:cleanup": HtmxElementDetail;
   "htmx:before:history:restore": HtmxHistoryRestoreDetail;
   "htmx:before:history:update": HtmxHistoryDetail;
@@ -1861,22 +1921,27 @@ interface HtmxEventDetailMap {
   "htmx:before:request": HtmxContextDetail;
   "htmx:before:response": HtmxContextDetail;
   "htmx:before:settle": HtmxSettleDetail;
-  "htmx:before:sse:connection": HtmxSseConnectionDetail;
-  "htmx:before:sse:message": HtmxSseMessageDetail;
   "htmx:before:swap": HtmxContextDetail & { tasks?: unknown[] };
   "htmx:finally:swap": HtmxContextDetail;
   "htmx:before:viewTransition": HtmxViewTransitionDetail;
-  "htmx:before:ws:connection": { connection: HtmxWsConnection };
-  "htmx:before:ws:message": HtmxWsMessageDetail;
-  "htmx:before:ws:request": HtmxWsRequestDetail;
   "htmx:config:request": HtmxContextDetail;
   "htmx:confirm": HtmxConfirmationDetail;
   "htmx:error": HtmxErrorDetail;
   "htmx:response:error": HtmxContextDetail & { status?: number };
   "htmx:finally:request": HtmxContextDetail;
   "htmx:process:partial": HtmxContextDetail & { tasks: unknown[] };
+  "htmx:sse:after:connection": HtmxSseConnectionDetail;
+  "htmx:sse:after:message": HtmxSseMessageDetail;
+  "htmx:sse:before:connection": HtmxSseConnectionDetail;
+  "htmx:sse:before:message": HtmxSseBeforeMessageDetail;
   "htmx:sse:close": HtmxSseCloseDetail;
   "htmx:sse:error": HtmxSseErrorDetail;
+  "htmx:ws:after:connection": { connection: HtmxWsConnection };
+  "htmx:ws:after:message:incoming": HtmxWsMessageDetail<HtmxWsIncomingMessage>;
+  "htmx:ws:after:message:outgoing": HtmxWsMessageDetail<HtmxWsOutgoingMessage>;
+  "htmx:ws:before:connection": { connection: HtmxWsConnection };
+  "htmx:ws:before:message:incoming": HtmxWsBeforeMessageDetail<HtmxWsIncomingMessage>;
+  "htmx:ws:before:message:outgoing": HtmxWsBeforeMessageDetail<HtmxWsOutgoingMessage>;
   "htmx:ws:close": HtmxWsCloseDetail;
   "htmx:ws:error": HtmxWsErrorDetail;
 }
