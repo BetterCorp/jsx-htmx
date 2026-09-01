@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "jsx-htmx",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "noEmit": true,
+    "strict": true,
+    "target": "es2021"
+  },
+  "include": ["test-types.tsx"]
+}
