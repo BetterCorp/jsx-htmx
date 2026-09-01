@@ -12,6 +12,22 @@ Type-safe htmx 4 JSX with a tiny server-side HTML renderer.
 - Escaped interpolation by default
 - No bundled browser runtime; `htmx.org` is an optional peer dependency
 
+## Why jsx-htmx?
+
+`htmx.org@4` ships TypeScript declarations for its browser API, but those declarations do not define JSX elements or `hx-*` props. `jsx-htmx` fills that authoring gap for server-rendered TSX.
+
+| Capability | `htmx.org@4` types | `jsx-htmx` |
+| --- | --- | --- |
+| Browser runtime | Included | Not included |
+| HTML in TSX | No JSX intrinsic elements or HTML props | Typed standard elements and attributes |
+| htmx attributes | No TSX prop types | Typed v4 attributes, values, and `:` modifiers |
+| Official extensions | No TSX prop or extension-event types | Typed bundled-extension attributes and events |
+| JavaScript API | Typed core API and core events | Typed core API, globals, core events, and extension events |
+| Server rendering | None | Tiny JSX-to-HTML renderer |
+| Interpolation safety | Not applicable | Escaped by default; `raw()` is explicit |
+
+Use `jsx-htmx` when TypeScript should check server-rendered TSX. Add `htmx.org@4` as well when the generated page needs htmx behavior in the browser; the packages complement each other.
+
 ## Install
 
 ```bash
