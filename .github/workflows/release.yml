@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   release:
     types: [published]
 
@@ -20,4 +21,6 @@ jobs:
           package-manager-cache: false
       - run: npm ci
       - run: npm test
-      - run: npm publish
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
