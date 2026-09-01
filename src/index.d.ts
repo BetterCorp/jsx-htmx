@@ -1672,8 +1672,9 @@ interface HtmxConfirmationDetail extends HtmxContextDetail {
   dropRequest: () => void;
 }
 
-interface HtmxErrorDetail extends HtmxContextDetail {
-  error?: unknown;
+interface HtmxErrorDetail {
+  ctx?: HtmxRequestContext;
+  error: unknown;
 }
 
 interface HtmxViewTransitionDetail extends HtmxContextDetail {

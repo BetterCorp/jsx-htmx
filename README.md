@@ -1,81 +1,93 @@
 # jsx-htmx
 
-Type-safe HTML and HTMX v4 templates using TypeScript.
+[![npm](https://img.shields.io/npm/v/jsx-htmx?style=flat-square)](https://www.npmjs.com/package/jsx-htmx)
+[![Release](https://github.com/BetterCorp/jsx-htmx/actions/workflows/release.yml/badge.svg)](https://github.com/BetterCorp/jsx-htmx/actions/workflows/release.yml)
+[![Node.js](https://img.shields.io/node/v/jsx-htmx?style=flat-square)](https://www.npmjs.com/package/jsx-htmx)
+[![license](https://img.shields.io/npm/l/jsx-htmx?style=flat-square)](https://www.npmjs.com/package/jsx-htmx)
 
-This package targets htmx `4.0.0`.
+Type-safe htmx 4 JSX with a tiny server-side HTML renderer.
 
-## Why
-
-I wanted an htmx-focused JSX library that:
-
-- does not globally replace the JSX namespace
-- does not rely on triple-slash references
-- can coexist with React or other JSX runtimes in the same repo
-- keeps htmx attributes and events typed
-
-## Scope
-
-`jsx-htmx` can be used in two ways:
-
-- as JSX typings only
-- as a small JSX-to-HTML templating runtime
-
-This package does not bundle `htmx` itself. Install `htmx.org@4` separately when you need the browser runtime.
-
-Any htmx attribute name that contains `:` must be written through a spread object in JSX:
-
-```tsx
-<button {...{ "hx-status:422": "target:#errors" }} />
-```
-
-Use direct JSX props only for names that are valid JSX identifiers, such as `hx-get`, `hx-post`, or the WebSocket alias props `hx-ws-connect` / `hx-ws-send`.
+- Typed HTML, htmx attributes, extensions, events, and browser API
+- A local JSX namespace that can coexist with React and other JSX runtimes
+- Escaped interpolation by default
+- No bundled browser runtime; `htmx.org` is an optional peer dependency
 
 ## Install
 
 ```bash
-npm install jsx-htmx htmx.org@4
+npm install jsx-htmx
 ```
 
-## Type Setup
+Add htmx itself when the generated HTML will use it in the browser:
 
-`tsconfig.json`:
+```bash
+npm install htmx.org@4
+```
+
+## Quick start
+
+Configure TypeScript:
 
 ```jsonc
 {
   "compilerOptions": {
     "jsx": "react-jsx",
-    "moduleResolution": "node16",
-    "jsxImportSource": "jsx-htmx"
+    "jsxImportSource": "jsx-htmx",
+    "module": "Node16",
+    "moduleResolution": "Node16"
   }
 }
 ```
 
-Or per file:
+Then write a component. JSX values render to HTML with `.toString()`:
 
 ```tsx
 /** @jsxImportSource jsx-htmx */
 
-export function Example() {
-  return <button hx-get="/messages">Load</button>;
+export function SaveButton() {
+  return (
+    <button hx-post="/messages" hx-vals={{ draft: true }}>
+      Save
+    </button>
+  );
 }
+
+const markup = SaveButton().toString();
 ```
 
-## Runtime Helpers
+Object values for `hx-config`, `hx-vals`, and `hx-headers` are serialized to JSON automatically.
 
-The runtime exports:
+### Per-file setup
 
-- **`createElement`** — the JSX factory. You rarely call it directly; it backs the `jsx-htmx` runtime.
-- **`html`** — a tagged template that interpolates values into escaped HTML. Object values for `hx-config`/`hx-vals`/`hx-headers` are serialized to JSON. Pass a `RawText` (e.g. from `css`/`js`) to opt out of escaping.
-- **`css`** — author CSS as a string (passthrough) or as a typed object of rules, returned as `RawText` for embedding in a `<style>` tag. See [Inline `css`](#inline-css).
-- **`js`** — embed client JavaScript as a string, or as a function whose **body is extracted** so your editor type-checks it, returned as `RawText` for a `<script>` tag. See [Inline `js`](#inline-js).
-- **`raw`** — mark a trusted HTML string for verbatim insertion. See [Escaping and trusted HTML](#escaping-and-trusted-html).
-- **`jsxConfig`** — runtime config: `jsonAttributes` (attribute names serialized to JSON), `trusted` (skip sanitization), and `sanitize` (the interpolation policy).
+If you do not want a project-wide `jsxImportSource`, use the pragma shown above in each `.tsx` file.
+
+### Attributes containing `:`
+
+JSX requires colon-delimited htmx attributes to be passed with object spread syntax:
+
+```tsx
+<button {...{ "hx-status:422": "target:#errors" }} />
+<div {...{ "hx-sse:connect": "/events" }} />
+```
+
+Direct props work for valid JSX names such as `hx-get`, `hx-post`, `hx-query`, `hx-ws-connect`, and `hx-ws-send`.
+
+## Runtime helpers
+
+| Export | Purpose |
+| --- | --- |
+| `createElement` | JSX factory used by the runtime |
+| `html` | Escaping tagged-template helper |
+| `css` | Typed CSS object or raw CSS string |
+| `js` | Browser-ready JavaScript string or extracted function body |
+| `raw` | Explicitly trusted HTML escape hatch |
+| `jsxConfig` | JSON attributes and interpolation policy |
 
 Everything returned by `raw`, `css`, and `js` is a `RawText` instance, so it is emitted verbatim and never double-escaped when placed inside JSX children.
 
 `hx-config`, `hx-vals`, and `hx-headers` support object literals and are serialized to JSON automatically. Their `data-hx-*` forms are supported too.
 
-### Escaping and trusted HTML
+### Security: escaping and trusted HTML
 
 Interpolated values are HTML-escaped by default. Build reusable output with JSX and interpolate it directly: the JSX tags remain markup while their data stays escaped.
 
@@ -108,35 +120,16 @@ return <div>{raw(output)}</div>;
 
 Applications can replace `jsxConfig.sanitize` with a custom interpolation policy or explicitly set it to `false`. Setting `jsxConfig.trusted` to `true` skips interpolation sanitization for the entire runtime.
 
-## HTMX v4 Support
+## htmx v4 support
 
-This package tracks **htmx v4** semantics, including:
+This package follows the shipped `htmx.org@4` types and extension source. Coverage includes:
 
-- `hx-action` + `hx-method`
-- `hx-config`
-- `hx-ignore` and the reassigned `hx-disable`
-- explicit inheritance modifiers like `:inherited` and `:append`
-- status-code rules via `hx-status:*`
-- the `outerSync` swap style
-- `hx-on` extended form (`hx-on="event -> code"`) alongside `hx-on:event`
-- `hx-trigger` modifiers minus the removed `queue:*` (use `hx-sync`), plus `intersect` `root`/`rootMargin`/`threshold`
-- `hx-history-elt` (restored from htmx 2)
-- the reactive `hx-live` extension attribute and the `htmx.live` API
-- reactive `hx-live:*` bindings and the expanded `q()` API (`attr`, `take`, `toggle`, `insert`, and `data`)
-- the `hx-prompt` extension and `htmx:prompt` event
-- the `hx-multipart` streaming extension attributes and lifecycle events
-- the `swapEmpty` modifier and `htmx.config.allowEmptySwapAfterOOB`
-- the `htmx:finally:swap` event name
-- the `hx-query` request attribute
-- the `hx-pending` extension
-- `htmx.initialize()` for async and streaming initialization
-- standardized `htmx:sse:*`, `htmx:ws:*`, and `htmx:head:*` extension events
-- the `hx-csp` extension (renamed from `hx-nonce`) and its `hx-nonce` attribute
-- typed v4 DOM events like `htmx:config:request`, `htmx:before:request`, `htmx:response:error`, `htmx:error`
-- SSE attributes `hx-sse:connect` and `hx-sse:close`
-- WebSocket attributes `hx-ws:connect` and `hx-ws:send`
-- JSX-friendly WebSocket aliases `hx-ws-connect` and `hx-ws-send`
-- a typed `htmx` global (and `window.htmx`) matching htmx 4's slimmed JS API (`registerExtension`, `timeout`, …)
+- core request, swap, synchronization, inheritance, status, history, and event attributes
+- `hx-query`, `hx-action`, `hx-method`, `hx-config`, and `swapEmpty`
+- typed lifecycle events plus the `htmx` and `window.htmx` APIs
+- reactive `hx-live` bindings and query API
+- SSE, WebSocket, multipart, prompt, pending, CSP, and head extensions
+- JSX-friendly aliases for colon-delimited WebSocket attributes
 
 ## Examples
 
@@ -331,7 +324,7 @@ document.body.addEventListener("htmx:config:request", (event) => {
 });
 
 document.body.addEventListener("htmx:error", (event) => {
-  console.error(event.detail.ctx.status, event.detail.error);
+  console.error(event.detail.ctx?.status, event.detail.error);
 });
 ```
 
@@ -421,7 +414,7 @@ export function Chat() {
 }
 ```
 
-## Notes For HTMX 2 Users
+## Notes for htmx 2 users
 
 This is a breaking-major track.
 
@@ -441,7 +434,7 @@ Notable htmx v4 changes outside this package:
 
 If you still need the v2 surface, stay on the v2 branch / release line.
 
-## Source Of Truth
+## Source of truth
 
 This package’s v4 typings were aligned against:
 
