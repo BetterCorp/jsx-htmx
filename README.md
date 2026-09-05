@@ -7,7 +7,10 @@
 
 Type-safe htmx 4 JSX with a tiny server-side HTML renderer.
 
-- Typed HTML, htmx attributes, extensions, events, and browser API
+**Upgrading to 4.0.100? This release includes breaking behavior changes. Read the
+[upgrade checklist](#upgrading-to-40100) before updating.**
+
+- Typed HTML, SVG, MathML Core, htmx attributes, extensions, events, and browser API
 - A local JSX namespace that can coexist with React and other JSX runtimes
 - Escaped interpolation by default
 - No bundled browser runtime; `htmx.org` is an optional peer dependency
@@ -30,6 +33,11 @@ Use `jsx-htmx` when TypeScript should check server-rendered TSX. Add `htmx.org@4
 
 ## Install
 
+Major and minor versions track the supported htmx release line. Patch versions
+track jsx-htmx changes and can include breaking changes; check the release notes
+when upgrading. Version `4.0.100` introduces scoped `js()` callbacks and corrected
+component escaping while continuing to target htmx 4.0.
+
 ```bash
 npm install jsx-htmx
 ```
@@ -39,6 +47,30 @@ Add htmx itself when the generated HTML will use it in the browser:
 ```bash
 npm install htmx.org@4
 ```
+
+## Upgrading to 4.0.100
+
+This release targets **htmx 4.0**. Its larger patch number identifies a substantial
+jsx-htmx update; it does not indicate a new htmx major/minor version. Existing
+dependency ranges such as `^4.0.0` can select this release, so review these changes
+even when your package manager presents it as a patch update.
+
+| Change in 4.0.100 | What to check before upgrading |
+| --- | --- |
+| `js(function)` retains a function scope and invokes it in the browser; it previously extracted the body into script scope. | Check globals and functions referenced by other scripts or inline handlers. Assign shared state/handlers explicitly to `window` and declare their TypeScript types. Local `const`, `let`, and `var` are fresh on each execution. String inputs remain verbatim. |
+| Repeated htmx script execution gets fresh locals. | Swap the same fragment at least twice. Check for duplicate document/window listeners, timers, and other side effects: function scope prevents declaration conflicts but does not perform cleanup. |
+| Components receive original props/children, and returned plain strings are escaped. | Remove manual pre-escaping workarounds. Return JSX for markup; embed independently trusted HTML with `<>{raw(trustedHtml)}</>`. Check nested components, fragments, and text containing `<`, `&`, or quotes. |
+| Boolean/null children are omitted, zero is retained, and `key` is not emitted. | Use `String(flag)` when boolean text is intentional. Replace selectors that relied on a rendered `key` with `id` or `data-*`. Check conditional rendering and snapshots. |
+| `createElement` renders `props.children`; explicit variadic children take precedence. | Check direct factory calls that supply children in both places or previously relied on `props.children` being ignored. |
+| JSX, `createElement` attributes, and `html` spreads share serialization. | Check htmx settings such as `hx-validate={false}`, history opt-outs, ARIA/data boolean values, and inherited JSON attributes. Presence flags such as `hx-ignore={false}` remain omitted. Update byte-for-byte markup snapshots for normalized JSON quoting and omitted metadata. |
+| Explicit htmx bindings, SVG names, and CSS custom properties retain their required casing. | Check `hx-live:textContent`, `viewBox`, gradient/filter names, and references to custom properties such as `--brandColor`. Remove spelling workarounds added for the previous serializer. |
+| Invalid dynamic element and attribute names now throw `TypeError`. | Check any names assembled at runtime; pass data as attribute values, not as fragments of markup in a name. |
+| Built-in SVG, MathML Core, and additional HTML/event types are available. | Remove conflicting local JSX declaration augmentations or SVG shims. Run your TypeScript checks and inspect icons, forms, slots, and math rendering. |
+
+After updating your lockfile, run your application's type checks and rendering
+tests, then exercise repeated htmx swaps in the browser. See [Inline `js`](#inline-js)
+and [Extending `window` in user scripts](#extending-window-in-user-scripts) for
+scoping and shared-state examples. No new runtime dependencies were added.
 
 ## Quick start
 
@@ -73,6 +105,41 @@ const markup = SaveButton().toString();
 
 Object values for `hx-config`, `hx-vals`, and `hx-headers` are serialized to JSON automatically.
 
+Function components receive their original props and children. Rendered text is
+escaped once; return JSX for markup, using `raw()` inside JSX for explicitly trusted HTML.
+Boolean and null children render nothing, while numeric zero is retained.
+
+JSX, `createElement` attributes, and `html` template spreads share attribute
+serialization, including JSON objects and inherited `hx-headers:inherited` /
+`hx-vals:inherited` attributes. Boolean htmx settings such as `hx-validate={false}`
+render as explicit `"false"` values; presence flags such as `hx-ignore={false}`
+are omitted. JSX `key` metadata is not emitted into HTML.
+
+### SVG and other elements
+
+SVG shapes, text, gradients, masks, filters, and animations have element-specific
+attributes. Use SVG's case-sensitive names (`viewBox`, `linearGradient`,
+`preserveAspectRatio`). Presentation attributes accept both `strokeWidth` and
+`stroke-width`; both render as `stroke-width`.
+
+```tsx
+<svg viewBox="0 0 24 24" width={24} height={24} role="img" aria-labelledby="icon-title">
+  <title id="icon-title">Check</title>
+  <path d="M5 12l4 4L19 6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+</svg>
+```
+
+Use `href` for SVG references, or `xlinkHref` / `"xlink:href"` for legacy assets.
+SVG supports htmx, inline event handlers, `data-*`, and `aria-*` attributes too.
+Unknown camelCase props and invalid enumerated values are rejected. TypeScript
+allows unknown hyphenated JSX props; use `satisfies JSX.IntrinsicElements["path"]`
+on a props object when checking their spelling matters.
+
+HTML coverage includes `hgroup`, `search`, `selectedcontent`, named slots,
+declarative shadow DOM, microdata, popovers, and global DOM events. Numeric HTML
+attributes accept numbers as well as strings. MathML Core elements such as
+`math`, `mfrac`, `mi`, `mo`, and `msup` are typed as well.
+
 ### Per-file setup
 
 If you do not want a project-wide `jsxImportSource`, use the pragma shown above in each `.tsx` file.
@@ -95,7 +162,7 @@ Direct props work for valid JSX names such as `hx-get`, `hx-post`, `hx-query`, `
 | `createElement` | JSX factory used by the runtime |
 | `html` | Escaping tagged-template helper |
 | `css` | Typed CSS object or raw CSS string |
-| `js` | Browser-ready JavaScript string or extracted function body |
+| `js` | Browser-ready JavaScript string or function invoked in its own scope |
 | `raw` | Explicitly trusted HTML escape hatch |
 | `jsxConfig` | JSON attributes and interpolation policy |
 
@@ -300,7 +367,22 @@ To pass through a raw string unchanged:
 
 ### Inline `js`
 
-`js` returns `RawText` for embedding in a `<script>` tag. Pass a string, or a **function whose body is extracted** — the function is never called at render time; its source is sliced out so your editor still type-checks and lints the client code.
+`js` returns `RawText` for embedding in a `<script>` tag. Pass a plain string, or
+a **function invoked in its own scope in the browser**. The function is never
+called at render time; its source is emitted as an immediately invoked function
+expression (IIFE), preserving editor type checking and linting.
+
+htmx can execute scripts again after a swap. Each function invocation gets fresh
+local variables, so `const` and `let` declarations can run repeatedly without
+global redeclaration errors, and `var` stays local too. Prefer `const` for values
+that are not reassigned and `let` for values that are. Store deliberately shared
+state on `window`, for example `window.myApp`.
+
+This changes the previous behavior, which extracted the function body into the
+script's top-level scope. Move globals needed by other scripts or inline handlers
+onto `window`, or use the string form for an explicitly unscoped script. Repeated
+event listener registration, timers, and other side effects still need appropriate
+initialization and cleanup; a fresh variable scope does not deduplicate them.
 
 ```tsx
 /** @jsxImportSource jsx-htmx */
@@ -321,13 +403,14 @@ export function Bootstrap() {
 }
 ```
 
-Both the function body form and an arrow expression are supported, and a plain string passes through unchanged:
+Arrow functions (including expression bodies), ordinary functions, and async
+functions are supported. A plain string passes through unchanged:
 
 ```tsx
 <script>{js("console.log('ready')")}</script>
 ```
 
-> The extracted source is emitted as written — it is **not** transpiled or bundled. Keep it to browser-ready JavaScript and avoid closing over server-side variables (interpolate values explicitly instead).
+> Function source is emitted as written — it is **not** transpiled or bundled. Keep it to browser-ready JavaScript and avoid closing over server-side variables (interpolate values explicitly instead).
 
 ### Typed htmx DOM events
 
@@ -451,6 +534,12 @@ Notable htmx v4 changes outside this package:
 If you still need the v2 surface, stay on the v2 branch / release line.
 
 ## Source of truth
+
+Element and attribute coverage is checked against the [HTML Standard](https://html.spec.whatwg.org/multipage/indices.html),
+the [SVG 2 attribute index](https://www.w3.org/TR/SVG2/attindex.html), and
+[MathML Core](https://w3c.github.io/mathml-core/). SVG presentation values reuse
+the installed `csstype` declarations. Type checks cover the standard HTML, SVG,
+and MathML element names in TypeScript's DOM library.
 
 This package’s v4 typings were aligned against:
 

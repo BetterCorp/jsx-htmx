@@ -2,6 +2,7 @@
 import {
   Attributes,
   Children,
+  ChildContent,
   CssDeclaration,
   CssRules,
   CustomElementHandler,
@@ -12,39 +13,71 @@ import {
 
 const capitalACharCode = "A".charCodeAt(0);
 const capitalZCharCode = "Z".charCodeAt(0);
-const booleanAttributes = new Set([
-  "allowfullscreen",
-  "async",
-  "autofocus",
-  "autoplay",
-  "checked",
-  "controls",
-  "default",
-  "defer",
-  "disabled",
-  "disableremoteplayback",
-  "download",
-  "formnovalidate",
-  "hidden",
-  "inert",
-  "ismap",
-  "loop",
-  "multiple",
-  "muted",
-  "nomodule",
-  "novalidate",
-  "open",
-  "playsinline",
-  "readonly",
-  "required",
-  "reversed",
-  "selected",
-]);
 const booleanishEnumeratedAttributes = new Set([
+  "accent",
+  "accentunder",
   "contenteditable",
+  "displaystyle",
   "draggable",
+  "externalResourcesRequired",
+  "fence",
+  "focusable",
+  "largeop",
+  "movablelimits",
+  "preserveAlpha",
+  "separator",
   "spellcheck",
+  "stretchy",
+  "symmetric",
+  "writingsuggestions",
+  "hx-boost",
+  "hx-browser-indicator",
+  "hx-history",
+  "hx-push-url",
+  "hx-replace-url",
+  "hx-swap-oob",
+  "hx-validate",
 ]);
+
+// SVG names are case-sensitive; other names retain the existing kebab-case convention.
+const svgTagNames = new Set([
+  "animateMotion", "animateTransform", "clipPath", "foreignObject",
+  "linearGradient", "radialGradient", "textPath",
+  "feBlend", "feColorMatrix", "feComponentTransfer", "feComposite",
+  "feConvolveMatrix", "feDiffuseLighting", "feDisplacementMap", "feDistantLight",
+  "feDropShadow", "feFlood", "feFuncA", "feFuncB", "feFuncG", "feFuncR",
+  "feGaussianBlur", "feImage", "feMerge", "feMergeNode", "feMorphology",
+  "feOffset", "fePointLight", "feSpecularLighting", "feSpotLight", "feTile",
+  "feTurbulence",
+]);
+const svgAttributeNames = new Set([
+  "attributeName", "attributeType", "baseFrequency", "baseProfile", "calcMode",
+  "clipPathUnits", "diffuseConstant", "edgeMode", "externalResourcesRequired",
+  "filterRes", "filterUnits", "glyphRef", "gradientTransform", "gradientUnits",
+  "kernelMatrix", "kernelUnitLength", "keyPoints", "keySplines", "keyTimes",
+  "lengthAdjust", "limitingConeAngle", "markerHeight", "markerUnits", "markerWidth",
+  "maskContentUnits", "maskUnits", "numOctaves", "pathLength", "patternContentUnits",
+  "patternTransform", "patternUnits", "pointsAtX", "pointsAtY", "pointsAtZ",
+  "preserveAlpha", "preserveAspectRatio", "primitiveUnits", "refX", "refY",
+  "repeatCount", "repeatDur", "requiredExtensions", "requiredFeatures",
+  "specularConstant", "specularExponent", "spreadMethod", "startOffset",
+  "stdDeviation", "stitchTiles", "surfaceScale", "systemLanguage", "tableValues",
+  "targetX", "targetY", "textLength", "viewBox", "viewTarget",
+  "xChannelSelector", "yChannelSelector", "zoomAndPan",
+]);
+const namespacedAttributes: Record<string, string> = {
+  xlinkActuate: "xlink:actuate",
+  xlinkArcrole: "xlink:arcrole",
+  xlinkHref: "xlink:href",
+  xlinkRole: "xlink:role",
+  xlinkShow: "xlink:show",
+  xlinkTitle: "xlink:title",
+  xlinkType: "xlink:type",
+  xmlBase: "xml:base",
+  xmlLang: "xml:lang",
+  xmlSpace: "xml:space",
+  xmlnsXlink: "xmlns:xlink",
+};
 
 export class RawText {
   constructor(private readonly value: string) {}
@@ -54,7 +87,7 @@ export class RawText {
   }
 }
 
-type ContentNode = string | RawText | ContentNode[];
+type ContentNode = ChildContent;
 
 const isUpper = (input: string, index: number) => {
   const charCode = input.charCodeAt(index);
@@ -62,6 +95,8 @@ const isUpper = (input: string, index: number) => {
 };
 
 const toKebabCase = (camelCased: string) => {
+  // Explicit markup/CSS spellings include case-sensitive htmx bindings and CSS variables.
+  if (camelCased.includes("-") || camelCased.includes(":")) return camelCased;
   let kebabCased = "";
   for (let i = 0; i < camelCased.length; i++) {
     const prevUpperCased = i > 0 ? isUpper(camelCased, i - 1) : true;
@@ -94,18 +129,29 @@ const attributeToString =
   (name: string): string => {
     const value = attributes[name];
     if (value === undefined || value === null) return "";
-    const formattedName = toKebabCase(name);
+    if (!name || /[\s\u0000"'<>/=`]/u.test(name)) {
+      throw new TypeError(`Invalid attribute name: ${name}`);
+    }
+    const formattedName = Object.prototype.hasOwnProperty.call(namespacedAttributes, name)
+      ? namespacedAttributes[name]!
+      : svgAttributeNames.has(name) ? name : toKebabCase(name);
     const makeAttribute = (value: string) => `${formattedName}="${value}"`;
-    if (value instanceof Date) {
+    if (
+      (jsxConfig.jsonAttributes.has(name) || jsxConfig.jsonAttributes.has(name.split(":")[0]!)) &&
+      typeof value === "object"
+    ) {
+      return makeAttribute(escapeAttrNodeValue(JSON.stringify(value)));
+    } else if (value instanceof Date) {
       return makeAttribute(value.toISOString());
     } else
       switch (typeof value) {
         case "boolean":
-          if (booleanishEnumeratedAttributes.has(formattedName)) {
+          if (
+            booleanishEnumeratedAttributes.has(formattedName.replace(/^data-(?=hx-)/, "").split(":")[0]!) ||
+            formattedName.startsWith("aria-") ||
+            (formattedName.startsWith("data-") && !formattedName.startsWith("data-hx-"))
+          ) {
             return makeAttribute(value ? "true" : "false");
-          }
-          if (value && booleanAttributes.has(formattedName)) {
-            return formattedName;
           }
           return value ? formattedName : "";
         default:
@@ -113,10 +159,10 @@ const attributeToString =
       }
   };
 
-const attributesToString = (attributes: Attributes | undefined): string => {
+const attributesToString = (attributes: Attributes | null | undefined): string => {
   if (attributes) {
     const rendered = Object.keys(attributes)
-      .filter((attribute) => attribute !== "children")
+      .filter((attribute) => attribute !== "children" && attribute !== "key")
       .map(attributeToString(attributes))
       .filter((attribute) => attribute.length)
       .join(" ");
@@ -127,6 +173,7 @@ const attributesToString = (attributes: Attributes | undefined): string => {
 };
 
 const contentNodeToString = (content: ContentNode): string => {
+  if (content === null || content === undefined || typeof content === "boolean") return "";
   return Array.isArray(content)
     ? content.map(contentNodeToString).join("")
     : content.toString();
@@ -163,20 +210,24 @@ const isVoidElement = (tagName: string) => {
 
 export function createElement(
   name: string | CustomElementHandler,
-  attributes: (Attributes & Children) | undefined = {},
+  attributes: (Attributes & Children) | null | undefined = {},
   ...contents: ContentNode[]
 ) {
-  const children = (attributes && attributes.children) || contents;
+  const children = contents.length ? contents : attributes?.children ?? [];
+  const childNodes = Array.isArray(children) ? children : [children];
 
   if (typeof name === "function") {
-    return name(children ? { children, ...attributes } : attributes, contents);
+    return name({ ...attributes, children }, childNodes);
   } else {
-    const tagName = toKebabCase(name);
-    if (isVoidElement(tagName) && !contents.length) {
+    if (!/^[a-z]/i.test(name) || /[\s\u0000"'<>/=`]/u.test(name)) {
+      throw new TypeError(`Invalid element name: ${name}`);
+    }
+    const tagName = svgTagNames.has(name) ? name : toKebabCase(name);
+    if (isVoidElement(tagName)) {
       return `<${tagName}${attributesToString(attributes)}>`;
     } else {
       return `<${tagName}${attributesToString(attributes)}>${contentsToString(
-        contents
+        childNodes
       )}</${tagName}>`;
     }
   }
@@ -203,7 +254,6 @@ export const jsxConfig: JsxConfig = {
 };
 
 const attrPattern = /[<>&"']/g;
-const attrPatternWithoutDQ = /[<>&']/g;
 const attrReplacements: Record<string, string> = {
   "<": "&lt;",
   ">": "&gt;",
@@ -219,12 +269,6 @@ function isRenderable(value: unknown): value is Renderable {
 function attrSanitizer(raw: Renderable): string {
   return String(raw).replaceAll(
     attrPattern,
-    (sub) => attrReplacements[sub] || sub
-  );
-}
-function attrSanitizerWithoutDQ(raw: Renderable): string {
-  return String(raw).replaceAll(
-    attrPatternWithoutDQ,
     (sub) => attrReplacements[sub] || sub
   );
 }
@@ -254,16 +298,7 @@ function htmlTransformChildren(value: InterpValue): string {
   if ("$$spread" in value && isObject(value.$$spread)) obj = value.$$spread;
   else if (isObject(value)) obj = value;
   else return "";
-  const out: string[] = [];
-  for (const [key, attr] of Object.entries(obj)) {
-    if (!isRenderable(attr) && attr !== "") continue;
-    if (jsxConfig.jsonAttributes.has(key)) {
-      out.push(`${key}='${attrSanitizerWithoutDQ(JSON.stringify(attr))}'`);
-    } else {
-      out.push(`${key}="${attrSanitizer(attr)}"`);
-    }
-  }
-  return out.join(" ");
+  return attributesToString(obj as Attributes).trimStart();
 }
 
 /**
@@ -277,7 +312,7 @@ function htmlTransformChildren(value: InterpValue): string {
  * const template = html`
  *   <div hx-vals=${{ foo: 'bar' }} />
  * `;
- * assertEqual(template, `<div hx-vals='{"foo":"bar"}' />`);
+ * assertEqual(template, `<div hx-vals="{&quot;foo&quot;:&quot;bar&quot;}" />`);
  * ```
  */
 export const html: HtmlTemplator = (raw, ...values) => {
@@ -371,26 +406,14 @@ export function css(input: string | CssRules): RawText {
   return new RawText(rules.join("\n"));
 }
 
-function extractFunctionBody(code: () => unknown): string {
-  const source = code.toString().trim();
-  const firstBrace = source.indexOf("{");
-  const lastBrace = source.lastIndexOf("}");
-
-  if (firstBrace >= 0 && lastBrace > firstBrace) {
-    return source.slice(firstBrace + 1, lastBrace).trim();
-  }
-
-  const arrowIndex = source.indexOf("=>");
-  if (arrowIndex >= 0) {
-    const expression = source.slice(arrowIndex + 2).trim();
-    return expression.endsWith(";") ? expression : `${expression};`;
-  }
-
-  return source;
-}
-
+/**
+ * htmx can execute a swapped script again. Invoke function inputs in their own
+ * scope so each run gets fresh locals: top-level let/const would otherwise throw
+ * on redeclaration, while var would leak into global scope. Shared state should
+ * use explicit window properties. String inputs remain verbatim for raw scripts.
+ */
 export function js(input: string | (() => unknown)): RawText {
-  return new RawText(typeof input === "string" ? input : extractFunctionBody(input));
+  return new RawText(typeof input === "string" ? input : `;(${input.toString()}\n)();`);
 }
 
 export function raw(input: string): RawText {

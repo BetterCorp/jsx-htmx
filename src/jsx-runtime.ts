@@ -23,6 +23,7 @@ export function Fragment({ children }: { children?: unknown }): Element {
 }
 
 function sanitizer(value: unknown): Element {
+  if (value === null || value === undefined || typeof value === "boolean") return "";
   if (Array.isArray(value)) {
     const children = value.map(sanitizer);
     return jsxConfig.trusted ? children.join("") : new Node(children);
@@ -34,21 +35,17 @@ function sanitizer(value: unknown): Element {
   return jsxConfig.sanitize(str, typeof value);
 }
 
-function expandLiterals(props: Record<string, unknown>) {
-  for (const attr of jsxConfig.jsonAttributes) {
-    if (!(attr in props)) continue;
-    const value = props[attr];
-    if (value !== null && typeof value === "object") {
-      props[attr] = { toString: () => JSON.stringify(value) };
-    }
-  }
-}
-
 export function jsx(
   tag: any,
-  { children, ...props }: { children?: unknown }
+  attributes: Record<string, unknown> | null = {}
 ): Element {
-  expandLiterals(props as any);
+  const { children, key, ...props } = attributes ?? {};
+  // Components need their original data. Escape only what they render, once.
+  if (typeof tag === "function") {
+    const contents = children === undefined ? [] : Array.isArray(children) ? children : [children];
+    const elt = sanitizer(tag({ ...props, children }, contents));
+    return jsxConfig.trusted ? elt : new Node(elt);
+  }
   const contents = Array.isArray(children)
     ? children.map(sanitizer)
     : [sanitizer(children)];
@@ -56,15 +53,4 @@ export function jsx(
   return jsxConfig.trusted ? elt : new Node(elt);
 }
 
-export function jsxs(
-  tag: any,
-  { children, ...props }: { children: unknown[] }
-): Element {
-  expandLiterals(props as any);
-  const elt = createElement(
-    tag,
-    props as any,
-    ...(children.map(sanitizer) as any[])
-  );
-  return jsxConfig.trusted ? elt : new Node(elt);
-}
+export const jsxs = jsx;

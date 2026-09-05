@@ -1,4 +1,5 @@
 export { Fragment } from "./jsx-runtime";
+export type { JSX } from "jsx-htmx/jsx-runtime";
 import { JSX } from "jsx-htmx/jsx-runtime";
 import { jsx, jsxs } from "./jsx-runtime";
 import type { Node } from "./jsx-runtime";

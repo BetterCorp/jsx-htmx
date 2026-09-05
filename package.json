@@ -1,7 +1,7 @@
 {
   "name": "jsx-htmx",
-  "version": "4.0.0",
-  "description": "Type-safe HTML and HTMX v4 templates using TypeScript.",
+  "version": "4.0.100",
+  "description": "Type-safe HTML, SVG, MathML and HTMX v4 templates using TypeScript.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/BetterCorp/jsx-htmx.git"
@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "test": "npm run build && npm run test:types && node --test test.mjs",
-    "test:types": "tsc -p tsconfig.test.json"
+    "test:types": "tsc -p tsconfig.test.json && tsc -p tsconfig.test.json --jsx react-jsxdev"
   },
   "engines": {
     "node": ">=20"
